@@ -42,7 +42,7 @@ export default function EmitirPublico() {
         items: [{ description: f.description || "Atlas Financeiro & Jurídico", quantity: 1, unit_price: total, discount: 0, vat: 0 }],
         due_label: f.due_label, currency: f.currency, notes: "", company_message: "", status: "pendente",
       };
-      const { data } = await axios.post(`${API}/public/invoice/create?tenant=${tenant}`, payload);
+      const { data } = await axios.post(`${API}/public/invoice/create?tenant=${tenant}`, payload, { headers: { "X-Public-Base": window.location.origin } });
       setResult(data);
       toast.success(`Fatura ${data.number} emitida`);
     } catch { toast.error("Erro ao emitir a fatura"); } finally { setSaving(false); }

@@ -22,9 +22,10 @@ export default function FaturaDetalhe() {
   useEffect(() => { load(); }, [id]);
   if (!inv) return <Loading />;
 
+  const pubLink = `${window.location.origin}/fatura/${inv.number}`;
   const changeStatus = async (s) => { try { await api.patch(`/invoices/${id}/status`, { status: s }); toast.success("Estado atualizado"); load(); } catch (e) { toast.error(apiError(e)); } };
-  const whatsapp = () => window.open(`https://wa.me/?text=${encodeURIComponent(`Fatura ${inv.number} — ${eur(inv.totals.total, inv.currency)}. Consulte: ${inv.public_link}`)}`, "_blank");
-  const copyLink = () => { navigator.clipboard.writeText(inv.public_link); toast.success("Link copiado"); };
+  const whatsapp = () => window.open(`https://wa.me/?text=${encodeURIComponent(`Fatura ${inv.number} — ${eur(inv.totals.total, inv.currency)}. Consulte: ${pubLink}`)}`, "_blank");
+  const copyLink = () => { navigator.clipboard.writeText(pubLink); toast.success("Link copiado"); };
   const del = async () => { if (!window.confirm("Eliminar esta fatura?")) return; try { await api.delete(`/invoices/${id}`); toast.success("Eliminada"); navigate("/app/faturas"); } catch (e) { toast.error(apiError(e)); } };
 
   return (
@@ -104,7 +105,7 @@ export default function FaturaDetalhe() {
           <Card>
             <div className="mb-3 font-head font-semibold text-[#0B1A30]">Verificação</div>
             {inv.qr_code && <img src={inv.qr_code} alt="QR" className="mx-auto h-36 w-36" data-testid="invoice-qr" />}
-            <div className="mt-2 break-all text-center text-xs text-slate-400">{inv.public_link}</div>
+            <div className="mt-2 break-all text-center text-xs text-slate-400">{pubLink}</div>
           </Card>
 
           {inv.proofs?.length > 0 && <Card><div className="mb-2 font-head font-semibold text-[#0B1A30]">Comprovativos</div>{inv.proofs.map((p) => <div key={p.id} className="flex items-center justify-between border-b border-slate-100 py-2 text-sm"><span>{p.filename}</span><StatusBadge status={p.status === "aceite" ? "pago" : p.status === "recusado" ? "expirado" : "analise"} /></div>)}</Card>}

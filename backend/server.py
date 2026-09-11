@@ -239,6 +239,17 @@ def make_qr_datauri(text: str) -> str:
 
 
 def public_base(request: Request) -> str:
+    # Frontend-controlled origin (immune to proxy host rewriting), then standard fallbacks
+    xpb = request.headers.get("x-public-base")
+    if xpb:
+        return xpb.rstrip("/")
+    origin = request.headers.get("origin")
+    if origin:
+        return origin.rstrip("/")
+    xfh = request.headers.get("x-forwarded-host")
+    if xfh:
+        proto = request.headers.get("x-forwarded-proto", "https")
+        return f"{proto}://{xfh.split(',')[0].strip()}"
     return os.environ.get("FRONTEND_URL") or str(request.base_url).rstrip("/")
 
 

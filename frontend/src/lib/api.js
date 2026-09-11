@@ -9,6 +9,7 @@ const api = axios.create({ baseURL: API });
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem("invest_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  config.headers["X-Public-Base"] = window.location.origin;
   return config;
 });
 

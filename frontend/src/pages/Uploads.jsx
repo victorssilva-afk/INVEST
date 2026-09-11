@@ -3,7 +3,7 @@ import api, { apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";
 import { useAuth } from "@/context/AuthContext";
 import { PageHeader, Card, Loading, Empty, GoldButton } from "@/components/ui/primitives";
-import { Upload as UploadIcon, Image as ImageIcon, Trash2, MessageCircle, Mail, Link2, Copy } from "lucide-react";
+import { Upload as UploadIcon, Image as ImageIcon, Trash2, MessageCircle, Mail, Link2, Download } from "lucide-react";
 import { toast } from "sonner";
 
 export default function Uploads() {
@@ -53,7 +53,7 @@ export default function Uploads() {
               <div className="mt-2 flex gap-1">
                 <button onClick={() => shareWa(it)} className="rounded p-1.5 text-green-600 hover:bg-green-50"><MessageCircle size={15} /></button>
                 <button onClick={() => shareMail(it)} className="rounded p-1.5 text-blue-600 hover:bg-blue-50"><Mail size={15} /></button>
-                <a href={it.file_data} download={it.filename} className="rounded p-1.5 text-slate-500 hover:bg-slate-100"><Copy size={15} /></a>
+                <a href={it.file_data} download={it.filename} title="Descarregar" data-testid={`download-upload-${it.id}`} className="rounded p-1.5 text-slate-600 hover:bg-slate-100"><Download size={15} /></a>
                 <button onClick={() => del(it.id)} className="ml-auto rounded p-1.5 text-red-500 hover:bg-red-50"><Trash2 size={15} /></button>
               </div>
             </Card>
