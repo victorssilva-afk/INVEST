@@ -81,8 +81,15 @@ export function generateInvoicePdf(inv) {
   doc.setFont("helvetica", "normal"); doc.setTextColor(...gray); doc.text(`SWIFT: ${swift}`, px, y + 27);
   if (b.entity) { doc.text(`Multibanco: Ent. ${b.entity} · Ref. ${b.reference || "—"}`, px, y + 27); }
 
+  // Banda IBAN em destaque — grande, a negrito, ao centro
+  const ibY = y + 34;
+  const ibDisp = b.iban ? maskIban(b.iban) : "—";
+  doc.setFillColor(...cream); doc.setDrawColor(...creambd); doc.setLineWidth(0.6); doc.roundedRect(14, ibY, W - 28, 16, 2, 2, "FD"); doc.setLineWidth(0.3);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(...gold); doc.text("IBAN PARA PAGAMENTO", W / 2, ibY + 5, { align: "center" });
+  doc.setFont("helvetica", "bold"); doc.setFontSize(16.5); doc.setTextColor(...navy); doc.text(ibDisp, W / 2, ibY + 12.5, { align: "center" });
+
   // items table
-  y += 38;
+  y = ibY + 22;
   doc.setFillColor(...navy); doc.rect(14, y, W - 28, 8.5, "F"); doc.setTextColor(255, 255, 255); doc.setFont("helvetica", "bold"); doc.setFontSize(7.2);
   doc.text("DESCRIÇÃO", 18, y + 5.6);
   doc.text("QTD", 112, y + 5.6, { align: "right" });
