@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api, { apiError } from "@/lib/api";
 import { eur, fmtDate } from "@/lib/format";
+import { generateInvoicePdf } from "@/lib/invoicePdf";
 import StatusBadge from "@/components/StatusBadge";
 import { PageHeader, Card, Loading, NavyButton } from "@/components/ui/primitives";
 import { toast } from "sonner";
+import { Download, ExternalLink } from "lucide-react";
 
 export default function ClienteDetalhe() {
   const { id } = useParams();
@@ -13,6 +15,13 @@ export default function ClienteDetalhe() {
   useEffect(() => { api.get(`/clients/${id}`).then((r) => setData(r.data)).catch((e) => { toast.error(apiError(e)); navigate("/app/clientes"); }); }, [id]);
   if (!data) return <Loading />;
   const { client, invoices, metrics } = data;
+
+  const downloadPdf = async (invId) => {
+    try {
+      const { data: inv } = await api.get(`/invoices/${invId}`);
+      generateInvoicePdf(inv);
+    } catch (e) { toast.error(apiError(e)); }
+  };
 
   return (
     <>
@@ -35,12 +44,21 @@ export default function ClienteDetalhe() {
         <Card className="lg:col-span-2"><h3 className="mb-3 font-head font-semibold text-[#0B1A30]">Histórico de faturas</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead><tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400"><th className="py-2">Número</th><th>Data</th><th>Estado</th><th className="text-right">Total</th></tr></thead>
+              <thead><tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-400"><th className="py-2">Número</th><th>Data</th><th>Estado</th><th className="text-right">Total</th><th className="text-right">Ações</th></tr></thead>
               <tbody>{invoices.map((i) => (
-                <tr key={i.id} className="cursor-pointer border-b border-slate-100 hover:bg-slate-50" onClick={() => navigate(`/app/faturas/${i.id}`)}>
-                  <td className="py-2.5 font-mono text-xs">{i.number}</td><td className="text-slate-500">{fmtDate(i.issue_date)}</td><td><StatusBadge status={i.status} /></td><td className="text-right font-semibold">{eur(i.totals.total, i.currency)}</td>
+                <tr key={i.id} className="border-b border-slate-100 hover:bg-slate-50">
+                  <td className="py-2.5 font-mono text-xs">{i.number}</td>
+                  <td className="text-slate-500">{fmtDate(i.issue_date)}</td>
+                  <td><StatusBadge status={i.status} /></td>
+                  <td className="text-right font-semibold">{eur(i.totals.total, i.currency)}</td>
+                  <td className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button data-testid={`open-invoice-${i.id}`} title="Abrir fatura" onClick={() => navigate(`/app/faturas/${i.id}`)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-[#0B1A30]"><ExternalLink size={15} /></button>
+                      <button data-testid={`pdf-invoice-${i.id}`} title="Descarregar PDF" onClick={() => downloadPdf(i.id)} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-[#0B1A30]"><Download size={15} /></button>
+                    </div>
+                  </td>
                 </tr>))}
-                {invoices.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-slate-400">Sem faturas</td></tr>}
+                {invoices.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-slate-400">Sem faturas</td></tr>}
               </tbody>
             </table>
           </div>
