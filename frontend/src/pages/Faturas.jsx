@@ -4,7 +4,8 @@ import api, { apiError } from "@/lib/api";
 import { eur, fmtDate } from "@/lib/format";
 import StatusBadge from "@/components/StatusBadge";
 import { Card, PageHeader, Loading, Empty, GoldButton } from "@/components/ui/primitives";
-import { Search, Receipt, Eye } from "lucide-react";
+import { Search, Receipt, Eye, Copy, ExternalLink, MessageCircle, Link2, Upload } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 
 const FILTERS = [
@@ -17,6 +18,13 @@ export default function Faturas() {
   const [status, setStatus] = useState("");
   const [q, setQ] = useState("");
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const tenant = user?.tenant_id || "invest";
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const emitLink = `${origin}/emitir/${tenant}`;
+  const uploadLink = `${origin}/enviar/${tenant}`;
+  const copy = (t) => { navigator.clipboard.writeText(t); toast.success("Link copiado"); };
+  const wa = (t) => window.open(`https://wa.me/?text=${encodeURIComponent(t)}`, "_blank");
 
   const load = () => {
     setInvoices(null);
@@ -29,6 +37,27 @@ export default function Faturas() {
       <PageHeader title="Faturas" subtitle="Emitir, gerir e acompanhar o estado das faturas">
         <GoldButton data-testid="new-invoice-btn" onClick={() => navigate("/app/faturas/nova")}>+ Nova Fatura</GoldButton>
       </PageHeader>
+
+      <Card className="mb-5 navy-gradient text-white">
+        <div className="flex items-center gap-2 font-head font-semibold"><Link2 size={18} className="text-[#D4AF37]" /> Páginas públicas — Mesa {tenant}</div>
+        <p className="mt-1 text-sm text-slate-300">Partilhe estes links. Qualquer pessoa pode emitir uma fatura ou enviar documentos sem precisar de conta.</p>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {[
+            { title: "Emitir fatura", desc: "Formulário público de emissão", link: emitLink, icon: Receipt, testid: "public-emit" },
+            { title: "Enviar fotos/documentos", desc: "Envio direto de ficheiros", link: uploadLink, icon: Upload, testid: "public-upload" },
+          ].map((x) => (
+            <div key={x.testid} className="rounded-xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center gap-2 font-semibold"><x.icon size={16} className="text-[#D4AF37]" /> {x.title}</div>
+              <div className="mt-1 truncate font-mono text-xs text-slate-300" data-testid={`${x.testid}-link`}>{x.link}</div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <a href={x.link} target="_blank" rel="noreferrer" data-testid={`${x.testid}-open`} className="flex items-center gap-1.5 rounded-lg gold-gradient px-3 py-1.5 text-xs font-semibold text-[#0B1A30]"><ExternalLink size={13} /> Abrir</a>
+                <button onClick={() => copy(x.link)} data-testid={`${x.testid}-copy`} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><Copy size={13} /> Copiar</button>
+                <button onClick={() => wa(`${x.title} INVEST: ${x.link}`)} data-testid={`${x.testid}-wa`} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><MessageCircle size={13} /> WhatsApp</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card className="mb-5">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
