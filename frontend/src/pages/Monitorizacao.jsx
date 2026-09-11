@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { WS_URL } from "@/lib/api";
+import { WS_URL, API } from "@/lib/api";
 import { PageHeader, Card } from "@/components/ui/primitives";
-import { Activity, Server, Database, Wifi, Users, Clock, Maximize2, RefreshCw, AlertTriangle, ExternalLink, Monitor, RotateCw } from "lucide-react";
+import { Activity, Server, Database, Wifi, Users, Clock, Maximize2, RefreshCw, AlertTriangle, ExternalLink, Monitor, RotateCw, Zap, ZapOff } from "lucide-react";
 
 const BROWSERLING = "https://www.browserling.com/browse/android15/chrome126";
 
@@ -18,6 +18,11 @@ export default function Monitorizacao() {
   const [clock, setClock] = useState(new Date());
   const [wake, setWake] = useState(false);
   const [frameKey, setFrameKey] = useState(0);
+  const [keepAlive, setKeepAlive] = useState(false);
+  const [renewSecs, setRenewSecs] = useState(150);
+  const [countdown, setCountdown] = useState(150);
+  const [pings, setPings] = useState(0);
+
   const wsRef = useRef(null);
   const retryRef = useRef(0);
   const heartbeatRef = useRef(null);
@@ -26,6 +31,12 @@ export default function Monitorizacao() {
   const rootRef = useRef(null);
   const frameRef = useRef(null);
   const wakeRef = useRef(null);
+  const audioRef = useRef(null);
+  const workerRef = useRef(null);
+  const renewSecsRef = useRef(150);
+  const countdownRef = useRef(150);
+
+  useEffect(() => { renewSecsRef.current = renewSecs; }, [renewSecs]);
 
   const connect = useCallback(() => {
     if (!mounted.current) return;
@@ -52,10 +63,9 @@ export default function Monitorizacao() {
     reconnectRef.current = setTimeout(connect, delay);
   }, [connect]);
 
-  // Wake Lock: keeps screen awake while this tab is open (não substitui a VPS)
   const requestWake = useCallback(async () => {
     try {
-      if ("wakeLock" in navigator) {
+      if ("wakeLock" in navigator && (!wakeRef.current || wakeRef.current.released)) {
         wakeRef.current = await navigator.wakeLock.request("screen");
         wakeRef.current.addEventListener("release", () => setWake(false));
         setWake(true);
@@ -63,11 +73,62 @@ export default function Monitorizacao() {
     } catch { setWake(false); }
   }, []);
 
+  const pingHealth = useCallback(() => {
+    fetch(`${API}/health`).then(() => setPings((p) => p + 1)).catch(() => {});
+  }, []);
+
+  const startKeepAlive = useCallback(() => {
+    // 1) áudio silencioso -> o Chrome considera o separador "a reproduzir" e não o suspende
+    try {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC && !audioRef.current) {
+        const ctx = new AC();
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        g.gain.value = 0.0001;
+        osc.frequency.value = 30;
+        osc.connect(g); g.connect(ctx.destination);
+        osc.start();
+        if (ctx.state === "suspended") ctx.resume();
+        audioRef.current = { ctx, osc };
+      }
+    } catch {}
+    // 2) timer em Web Worker -> não é abrandado quando o separador está em segundo plano
+    if (!workerRef.current) {
+      const code = "let n=0;setInterval(function(){n++;postMessage(n);},1000);";
+      const url = URL.createObjectURL(new Blob([code], { type: "application/javascript" }));
+      const w = new Worker(url);
+      w.onmessage = () => {
+        countdownRef.current -= 1;
+        setCountdown(countdownRef.current);
+        try { document.dispatchEvent(new MouseEvent("mousemove", { bubbles: true })); } catch {}
+        if (countdownRef.current % 10 === 0) { pingHealth(); requestWake(); }
+        if (countdownRef.current <= 0) {
+          setFrameKey((k) => k + 1);                 // renova a sessão do browserling antes de expirar
+          countdownRef.current = renewSecsRef.current;
+          setCountdown(renewSecsRef.current);
+        }
+      };
+      workerRef.current = { w, url };
+    }
+    countdownRef.current = renewSecsRef.current;
+    setCountdown(renewSecsRef.current);
+    requestWake();
+    setKeepAlive(true);
+  }, [pingHealth, requestWake]);
+
+  const stopKeepAlive = useCallback(() => {
+    try { audioRef.current?.osc.stop(); audioRef.current?.ctx.close(); } catch {}
+    audioRef.current = null;
+    if (workerRef.current) { try { workerRef.current.w.terminate(); URL.revokeObjectURL(workerRef.current.url); } catch {} workerRef.current = null; }
+    setKeepAlive(false);
+  }, []);
+
   useEffect(() => {
     mounted.current = true;
     connect();
     requestWake();
-    const onVis = () => { if (document.visibilityState === "visible") { requestWake(); } };
+    const onVis = () => { if (document.visibilityState === "visible") requestWake(); };
     document.addEventListener("visibilitychange", onVis);
     const clockT = setInterval(() => setClock(new Date()), 1000);
     return () => {
@@ -77,11 +138,14 @@ export default function Monitorizacao() {
       clearTimeout(reconnectRef.current);
       document.removeEventListener("visibilitychange", onVis);
       try { wakeRef.current?.release?.(); } catch {}
+      try { audioRef.current?.osc.stop(); audioRef.current?.ctx.close(); } catch {}
+      if (workerRef.current) { try { workerRef.current.w.terminate(); URL.revokeObjectURL(workerRef.current.url); } catch {} }
       if (wsRef.current) { wsRef.current.onclose = null; try { wsRef.current.close(); } catch {} }
     };
   }, [connect, requestWake]);
 
   const fullscreen = (el) => { if (!document.fullscreenElement) el?.requestFullscreen?.(); else document.exitFullscreen?.(); };
+  const renewNow = () => { setFrameKey((k) => k + 1); countdownRef.current = renewSecsRef.current; setCountdown(renewSecsRef.current); };
 
   const s = STATE[conn];
   const items = [
@@ -90,6 +154,7 @@ export default function Monitorizacao() {
     { label: "Base de dados", value: stats?.database === "ok" ? "Online" : "—", icon: Database, ok: stats?.database === "ok" },
     { label: "API", value: stats?.api === "operacional" ? "Operacional" : "—", icon: Wifi, ok: !!stats?.api },
   ];
+  const mmss = (n) => `${String(Math.floor(Math.max(0, n) / 60)).padStart(2, "0")}:${String(Math.max(0, n) % 60).padStart(2, "0")}`;
 
   return (
     <div ref={rootRef} className="min-h-full">
@@ -119,36 +184,50 @@ export default function Monitorizacao() {
         ))}
       </div>
 
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
+      <div className="mt-5 grid gap-4 md:grid-cols-4">
         <Card><div className="flex items-center gap-2 text-slate-400"><Clock size={16} /> <span className="text-xs uppercase">Uptime</span></div><div className="mt-2 font-head text-xl font-bold text-[#0B1A30]" data-testid="uptime">{stats?.uptime || "—"}</div></Card>
         <Card><div className="flex items-center gap-2 text-slate-400"><Users size={16} /> <span className="text-xs uppercase">Utilizadores online</span></div><div className="mt-2 font-head text-xl font-bold text-[#0B1A30]">{stats?.online_users ?? "—"}</div></Card>
         <Card><div className="flex items-center gap-2 text-slate-400"><Monitor size={16} /> <span className="text-xs uppercase">Ecrã ativo (Wake Lock)</span></div><div className="mt-2 font-head text-xl font-bold" style={{ color: wake ? "#16a34a" : "#94a3b8" }}>{wake ? "Ativo" : "Inativo"}</div></Card>
+        <Card><div className="flex items-center gap-2 text-slate-400"><Zap size={16} /> <span className="text-xs uppercase">Pings keep-alive</span></div><div className="mt-2 font-head text-xl font-bold text-[#0B1A30]">{pings}</div></Card>
       </div>
 
-      {/* Sessão Chrome permanente embebida */}
+      {/* Sessão Chrome permanente + Modo Sempre Ativo */}
       <Card className="mt-5 p-0 overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-[#0B1A30] px-4 py-3 text-white">
           <div className="flex items-center gap-2 font-head font-semibold"><Monitor size={17} className="text-[#D4AF37]" /> Sessão Chrome Permanente</div>
-          <div className="flex items-center gap-2">
-            <button data-testid="frame-reload" onClick={() => setFrameKey((k) => k + 1)} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><RotateCw size={13} /> Recarregar</button>
+          <div className="flex flex-wrap items-center gap-2">
+            {!keepAlive ? (
+              <button data-testid="keepalive-on" onClick={startKeepAlive} className="flex items-center gap-1.5 rounded-lg gold-gradient px-3 py-1.5 text-xs font-bold text-[#0B1A30]"><Zap size={13} /> Ativar modo sempre ativo</button>
+            ) : (
+              <button data-testid="keepalive-off" onClick={stopKeepAlive} className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white"><ZapOff size={13} /> Sempre ativo: LIGADO</button>
+            )}
+            <button data-testid="frame-reload" onClick={renewNow} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><RotateCw size={13} /> Renovar agora</button>
             <button data-testid="frame-fullscreen" onClick={() => fullscreen(frameRef.current)} className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><Maximize2 size={13} /> Ecrã inteiro</button>
-            <a data-testid="frame-newtab" href={BROWSERLING} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg gold-gradient px-3 py-1.5 text-xs font-semibold text-[#0B1A30]"><ExternalLink size={13} /> Abrir em nova janela</a>
+            <a data-testid="frame-newtab" href={BROWSERLING} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><ExternalLink size={13} /> Nova janela</a>
           </div>
         </div>
+
+        {keepAlive && (
+          <div className="flex flex-wrap items-center gap-4 border-b border-slate-200 bg-emerald-50 px-4 py-2.5 text-xs text-emerald-800">
+            <span className="flex items-center gap-1.5 font-semibold"><span className="h-2 w-2 rounded-full bg-emerald-500 pulse-dot" /> Modo sempre ativo LIGADO</span>
+            <span>Renova a sessão em <b data-testid="renew-countdown">{mmss(countdown)}</b></span>
+            <label className="flex items-center gap-1.5">Renovar a cada
+              <select data-testid="renew-interval" value={renewSecs} onChange={(e) => setRenewSecs(+e.target.value)} className="rounded border border-emerald-300 bg-white px-1.5 py-0.5">
+                <option value={90}>90s</option><option value={120}>2 min</option><option value={150}>2,5 min</option><option value={180}>3 min</option>
+              </select>
+            </label>
+            <span>Áudio silencioso + Wake Lock + Web Worker ativos</span>
+          </div>
+        )}
+
         <div ref={frameRef} className="bg-black">
-          <iframe
-            key={frameKey}
-            title="Sessão Chrome Permanente"
-            src={BROWSERLING}
-            data-testid="chrome-iframe"
-            className="h-[640px] w-full border-0"
-            allow="fullscreen; clipboard-read; clipboard-write; autoplay"
-            referrerPolicy="no-referrer"
-          />
+          <iframe key={frameKey} title="Sessão Chrome Permanente" src={BROWSERLING} data-testid="chrome-iframe"
+            className="h-[640px] w-full border-0" allow="fullscreen; clipboard-read; clipboard-write; autoplay" referrerPolicy="no-referrer" />
         </div>
+
         <div className="border-t border-slate-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-          <b>Como manter 24/7:</b> deixe esta aba aberta e fixe-a (⌘/Ctrl + clique direito → “Fixar separador”). O <b>Wake Lock</b> impede o ecrã de suspender enquanto a aba está visível, e a ligação reconecta sozinha. Se o browserling não carregar dentro desta janela por restrições de segurança, use <b>“Abrir em nova janela”</b>.
-          <br />⚠️ Nota técnica: nenhuma aba do Chrome sobrevive a desligar o computador — por isso o servidor INVEST corre de forma <b>independente numa VPS 24/7</b>. Esta aba é apenas o painel de acompanhamento.
+          <b>Modo sempre ativo — o que faz:</b> mantém o separador acordado com <b>áudio silencioso</b> (o Chrome não suspende separadores que reproduzem som), <b>Wake Lock</b> (ecrã não adormece), um <b>Web Worker</b> (temporizador que não abranda em segundo plano) e um <b>ping</b> ao backend a cada 10s. Como a sessão gratuita do browserling é um <b>demo com tempo limitado</b>, o modo <b>renova a janela automaticamente</b> antes de expirar (intervalo configurável acima).
+          <br />⚠️ Por segurança do navegador, <b>não é possível injetar cliques dentro do ecrã do browserling</b> (é outro domínio) — nenhuma página consegue clicar dentro de um iframe externo. Para sessões verdadeiramente ilimitadas, use uma conta browserling paga ou outro serviço de browser na nuvem. Para funcionar sem o seu PC, aloje o painel num dispositivo sempre-ligado (mini-PC/VPS). O <b>backend INVEST já corre 24/7 no servidor</b>, independente desta janela.
         </div>
       </Card>
 
