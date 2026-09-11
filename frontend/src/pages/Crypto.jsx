@@ -59,6 +59,8 @@ export default function Crypto() {
   return (
     <>
       <PageHeader title="Análise Crypto" subtitle="Central de inteligência · dados reais CoinGecko + análise IA">
+        <button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/crypto-publico`); toast.success("Link público copiado"); }} data-testid="copy-crypto-public-link" className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-[#0B1A30] hover:bg-slate-200"><Star size={15} /> Copiar link público</button>
+        <a href="/crypto-publico" target="_blank" rel="noreferrer" data-testid="open-crypto-public" className="flex items-center gap-1.5 rounded-lg gold-gradient px-4 py-2 text-sm font-bold text-[#0B1A30]"><Newspaper size={15} /> Análise Pública</a>
         <NavyButton data-testid="crypto-history-btn" onClick={() => navigate("/app/crypto/historico")}><History size={15} className="mr-1 inline" /> Histórico</NavyButton>
         <button onClick={loadMarket} className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-4 py-2 text-sm font-semibold text-[#0B1A30] hover:bg-slate-200"><RefreshCw size={15} /> Atualizar</button>
       </PageHeader>

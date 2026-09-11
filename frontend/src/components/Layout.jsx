@@ -5,19 +5,21 @@ import api from "@/lib/api";
 import {
   LayoutDashboard, Users, FileText, Receipt, Upload, FileSignature,
   LayoutTemplate, BarChart3, History, Settings, Calculator, Activity,
-  Bitcoin, LogOut, Menu, X, ShieldCheck,
+  Bitcoin, LogOut, Menu, X, ShieldCheck, Target, Globe,
 } from "lucide-react";
 
 const NAV = [
   { to: "/app", icon: LayoutDashboard, label: "Dashboard", testid: "nav-dashboard", end: true },
   { to: "/app/faturas", icon: Receipt, label: "Faturas", testid: "nav-faturas" },
   { to: "/app/clientes", icon: Users, label: "Clientes", testid: "nav-clientes" },
+  { to: "/app/leads", icon: Target, label: "Leads", testid: "nav-leads" },
   { to: "/app/comprovativos", icon: FileText, label: "Comprovativos", testid: "nav-comprovativos", counter: "proofs_pending" },
   { to: "/app/uploads", icon: Upload, label: "Fotos & Documentos", testid: "nav-uploads", counter: "uploads_pending" },
   { to: "/app/contratos", icon: FileSignature, label: "Contratos", testid: "nav-contratos" },
   { to: "/app/modelos", icon: LayoutTemplate, label: "Modelos", testid: "nav-modelos" },
   { to: "/app/calculo", icon: Calculator, label: "Cálculo", testid: "nav-calculo" },
   { to: "/app/crypto", icon: Bitcoin, label: "Análise Crypto", testid: "nav-crypto" },
+  { to: "/crypto-publico", icon: Globe, label: "Análise Pública", testid: "nav-crypto-publico" },
   { to: "/app/relatorios", icon: BarChart3, label: "Relatórios", testid: "nav-relatorios" },
   { to: "/app/historico", icon: History, label: "Histórico", testid: "nav-historico" },
   { to: "/app/monitorizacao", icon: Activity, label: "Monitorização", testid: "nav-monitorizacao" },

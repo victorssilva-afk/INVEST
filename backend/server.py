@@ -1168,6 +1168,136 @@ async def on_shutdown():
     client.close()
 
 
+# ---------------- Leads (acesso individual por utilizador) ----------------
+LEAD_STATUSES = ["No Answer", "NA Hot", "Not Interested", "Low Potential", "No Potential", "Duplicate"]
+
+
+@api.get("/leads/stats")
+async def leads_stats(user: dict = Depends(get_current_user)):
+    leads = await db.leads.find({"tenant_id": user["tenant_id"], "owner_id": user["id"]}, {"_id": 0}).to_list(5000)
+    from collections import defaultdict
+    funnels = defaultdict(lambda: {"count": 0, "value": 0.0})
+    affs = defaultdict(lambda: {"count": 0, "value": 0.0})
+    statuses = defaultdict(int)
+    total = 0.0
+    for lead in leads:
+        v = float(lead.get("value_eur") or 0)
+        total += v
+        f = lead.get("funnel") or "—"
+        a = lead.get("affiliate") or "—"
+        funnels[f]["count"] += 1
+        funnels[f]["value"] += v
+        affs[a]["count"] += 1
+        affs[a]["value"] += v
+        statuses[lead.get("status") or "—"] += 1
+    top = lambda d: sorted([{"name": k, **v} for k, v in d.items()], key=lambda x: x["value"], reverse=True)
+    return {"total_leads": len(leads), "total_value": total,
+            "top_funnels": top(funnels)[:10], "top_affiliates": top(affs)[:10],
+            "status_breakdown": [{"status": k, "count": v} for k, v in statuses.items()],
+            "statuses": LEAD_STATUSES}
+
+
+@api.get("/leads")
+async def list_leads(status: str = None, funnel: str = None, affiliate: str = None, user: dict = Depends(get_current_user)):
+    q = {"tenant_id": user["tenant_id"], "owner_id": user["id"]}
+    if status:
+        q["status"] = status
+    if funnel:
+        q["funnel"] = funnel
+    if affiliate:
+        q["affiliate"] = affiliate
+    return await db.leads.find(q, {"_id": 0}).sort("created_at", -1).to_list(1000)
+
+
+@api.post("/leads")
+async def create_lead(body: dict, user: dict = Depends(get_current_user)):
+    doc = {
+        "id": str(uuid.uuid4()), "tenant_id": user["tenant_id"], "owner_id": user["id"], "owner_name": user["name"],
+        "name": body.get("name", ""), "seller": body.get("seller", ""), "value_eur": float(body.get("value_eur") or 0),
+        "affiliate": body.get("affiliate", ""), "funnel": body.get("funnel", ""),
+        "type": body.get("type", "Novo"), "status": body.get("status", "No Answer"),
+        "created_at": now_iso(), "updated_at": now_iso(),
+    }
+    await db.leads.insert_one(dict(doc))
+    doc.pop("_id", None)
+    await log_history("criou lead", "lead", doc["name"], user)
+    return doc
+
+
+@api.put("/leads/{lid}")
+async def update_lead(lid: str, body: dict, user: dict = Depends(get_current_user)):
+    fields = {k: body[k] for k in ["name", "seller", "value_eur", "affiliate", "funnel", "type", "status"] if k in body}
+    if "value_eur" in fields:
+        fields["value_eur"] = float(fields["value_eur"] or 0)
+    fields["updated_at"] = now_iso()
+    r = await db.leads.update_one({"id": lid, "owner_id": user["id"], "tenant_id": user["tenant_id"]}, {"$set": fields})
+    if not r.matched_count:
+        raise HTTPException(404, "Não encontrado")
+    return await db.leads.find_one({"id": lid}, {"_id": 0})
+
+
+@api.delete("/leads/{lid}")
+async def delete_lead(lid: str, user: dict = Depends(get_current_user)):
+    r = await db.leads.delete_one({"id": lid, "owner_id": user["id"], "tenant_id": user["tenant_id"]})
+    if not r.deleted_count:
+        raise HTTPException(404, "Não encontrado")
+    return {"ok": True}
+
+
+# ---------------- Crypto público (sem autenticação) ----------------
+@api.get("/public/crypto/market")
+async def public_crypto_market():
+    try:
+        market = await crypto.get_market()
+    except Exception as e:
+        raise HTTPException(502, f"Dados de mercado indisponíveis: {e}")
+    glob, fng, stables = await asyncio.gather(
+        crypto.get_global(), crypto.get_fng(), crypto.get_stablecoins(), return_exceptions=True)
+    glob = {} if isinstance(glob, Exception) else glob
+    fng = {"value": None, "classification": None, "available": False} if isinstance(fng, Exception) else fng
+    stables = [] if isinstance(stables, Exception) else stables
+    return {"market": market, "global": glob, "fear_greed": fng, "stablecoins": stables,
+            "updated_at": now_iso(), "sources": crypto_sources()}
+
+
+@api.get("/public/crypto/assets/{symbol}")
+async def public_crypto_asset(symbol: str, days: str = "30"):
+    try:
+        chart = await crypto.get_chart(symbol.upper(), days)
+        return {"symbol": symbol.upper(), "chart": chart, "indicators": crypto.compute_indicators(chart["prices"])}
+    except Exception as e:
+        raise HTTPException(502, f"Dados indisponíveis nesta fonte: {e}")
+
+
+@api.get("/public/crypto/news")
+async def public_crypto_news():
+    news = await crypto.get_news()
+    return {"news": news, "available": bool(news), "updated_at": now_iso()}
+
+
+@api.post("/public/crypto/analysis")
+async def public_crypto_analysis(body: dict):
+    symbol = (body.get("symbol") or "BTC").upper()
+    timeframe = body.get("timeframe") or "4h"
+    days = {"1h": "1", "4h": "7", "1D": "30", "1W": "90", "1M": "365"}.get(timeframe, "30")
+    try:
+        chart, market = await asyncio.gather(crypto.get_chart(symbol, days), crypto.get_market([symbol]))
+    except Exception as e:
+        raise HTTPException(502, f"Dados indisponíveis nesta fonte: {e}")
+    glob, fng, stables = await asyncio.gather(
+        crypto.get_global(), crypto.get_fng(), crypto.get_stablecoins(), return_exceptions=True)
+    glob = {} if isinstance(glob, Exception) else glob
+    fng = {"value": None, "classification": None, "available": False} if isinstance(fng, Exception) else fng
+    stables = [] if isinstance(stables, Exception) else stables
+    ind = crypto.compute_indicators(chart["prices"])
+    row = market[0] if market else {}
+    scores = crypto.compute_scores(ind, fng, stables, glob.get("market_cap_change_24h"))
+    report = await crypto.generate_ai_report(symbol, timeframe, ind, scores, row, glob, fng)
+    return {"asset": symbol, "timeframe": timeframe, **scores,
+            "trend": crypto.trend_label(scores["final_score"]), "indicators": ind,
+            "report": report, "market": row, "fear_greed": fng, "generated_at": now_iso()}
+
+
 app.include_router(api)
 app.add_middleware(
     CORSMiddleware,

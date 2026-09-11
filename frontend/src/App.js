@@ -20,6 +20,8 @@ import Calculo from "@/pages/Calculo";
 import Monitorizacao from "@/pages/Monitorizacao";
 import Crypto from "@/pages/Crypto";
 import CryptoHistorico from "@/pages/CryptoHistorico";
+import Leads from "@/pages/Leads";
+import CryptoPublico from "@/pages/CryptoPublico";
 import EmitirPublico from "@/pages/public/EmitirPublico";
 import EnviarPublico from "@/pages/public/EnviarPublico";
 import FaturaPublica from "@/pages/public/FaturaPublica";
@@ -48,6 +50,7 @@ export default function App() {
         <Route path="/emitir/:tenant" element={<EmitirPublico />} />
         <Route path="/enviar/:tenant" element={<EnviarPublico />} />
         <Route path="/fatura/:number" element={<FaturaPublica />} />
+        <Route path="/crypto-publico" element={<CryptoPublico />} />
         <Route path="/" element={<Navigate to="/app" replace />} />
         <Route path="/app" element={<Protected><Dashboard /></Protected>} />
         <Route path="/app/faturas" element={<Protected><Faturas /></Protected>} />
@@ -68,6 +71,7 @@ export default function App() {
         <Route path="/app/monitorizacao" element={<Protected><Monitorizacao /></Protected>} />
         <Route path="/app/crypto" element={<Protected><Crypto /></Protected>} />
         <Route path="/app/crypto/historico" element={<Protected><CryptoHistorico /></Protected>} />
+        <Route path="/app/leads" element={<Protected><Leads /></Protected>} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Routes>
     </BrowserRouter>
