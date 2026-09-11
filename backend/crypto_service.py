@@ -268,6 +268,21 @@ def trend_label(score):
     return "Fortemente Bearish"
 
 
+def signal_distribution(final_score, confidence):
+    """Converte score/confiança em percentagens Compra/Neutro/Venda (somam 100)."""
+    s = max(-100, min(100, final_score or 0))
+    conf = max(0, min(100, confidence or 50))
+    neutral = max(8, min(80, 45 - abs(s) * 0.35 + (100 - conf) * 0.25))
+    remaining = 100 - neutral
+    buy = max(0, min(remaining, remaining * (0.5 + s / 200.0)))
+    sell = remaining - buy
+    b, n, se = round(buy), round(neutral), round(sell)
+    b += 100 - (b + n + se)
+    rec = "Compra" if b > se and b >= n else "Venda" if se > b and se >= n else "Neutro"
+    direction = "up" if rec == "Compra" else "down" if rec == "Venda" else "neutral"
+    return {"buy": b, "neutral": n, "sell": se, "recommendation": rec, "direction": direction}
+
+
 async def get_news(limit=20):
     """Free RSS from Cointelegraph. Classify bullish/bearish with keyword heuristic."""
     cached = _get("news", 600)
@@ -316,8 +331,14 @@ async def generate_ai_report(symbol, timeframe, ind, scores, market_row, glob, f
             "Usa linguagem de probabilidade — NUNCA afirmes certezas ('vai subir/cair'). "
             "Baseia-te apenas nos dados fornecidos. Onde faltarem dados (macro, on-chain), diz explicitamente que não há fonte fiável. "
             "Estrutura a resposta em secções curtas com estes títulos exatos:\n"
-            "ESTADO ATUAL\nTÉCNICA\nMACRO\nSENTIMENTO\nLIQUIDEZ\nCATALISADORES DE ALTA\nCATALISADORES DE BAIXA\n"
-            "CENÁRIO BULLISH\nCENÁRIO BASE\nCENÁRIO BEARISH\nRISCOS\nRESUMO\n"
+            "RESUMO SIMPLES\nESTADO ATUAL\nTÉCNICA\nMACRO\nSENTIMENTO\nLIQUIDEZ\n"
+            "CATALISADORES DE ALTA\nCATALISADORES DE BAIXA\n"
+            "CENÁRIO BULLISH\nCENÁRIO BASE\nCENÁRIO BEARISH\nRISCOS\nVEREDICTO DO MESTRE INVESTIDOR\nRESUMO\n"
+            "Em RESUMO SIMPLES escreve 2-3 frases muito simples, para leigos, sem termos técnicos. "
+            "No VEREDICTO DO MESTRE INVESTIDOR assume a voz do investidor mais sábio do planeta, com milénios de "
+            "experiência de mercado: indica claramente se COMPRARIAS, VENDERIAS ou ficarias NEUTRO e explica o porquê de "
+            "cada decisão, cruzando os reflexos do mercado, possíveis movimentos de baleias on-chain e estratégias "
+            "políticas/regulatórias. Mantém linguagem de probabilidade (nunca garantias). "
             "No RESUMO indica tendência de curto/médio/longo prazo. Sê objetivo e conciso."
         )
         chat = LlmChat(api_key=key, session_id=f"crypto-{symbol}-{int(time.time())}",

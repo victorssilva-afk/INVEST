@@ -76,6 +76,17 @@ export default function CryptoPublico() {
                 {scoreCard("Técnico", analysis.technical_score)}{scoreCard("Macro", analysis.macro_score)}{scoreCard("On-chain", analysis.onchain_score)}{scoreCard("Sentimento", analysis.sentiment_score)}{scoreCard("Liquidez", analysis.liquidity_score)}
                 <div className="rounded-xl border border-[#D4AF37]/40 bg-[#D4AF37]/10 p-3"><div className="text-xs text-[#D4AF37]">Score final</div><div className="font-head text-xl font-bold">{analysis.final_score > 0 ? "+" : ""}{analysis.final_score}</div></div>
               </div>
+              {analysis.signal && (
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4" data-testid="pub-signal">
+                  <div className="mb-2 flex items-center justify-between text-sm"><span className="font-semibold">Sinal de mercado</span><span className="rounded-full bg-[#D4AF37] px-3 py-0.5 text-xs font-bold text-[#0B1A30]">{analysis.signal.recommendation}</span></div>
+                  <div className="flex h-4 overflow-hidden rounded-full">
+                    <div style={{ width: `${analysis.signal.buy}%`, background: "#22c55e" }} />
+                    <div style={{ width: `${analysis.signal.neutral}%`, background: "#64748b" }} />
+                    <div style={{ width: `${analysis.signal.sell}%`, background: "#ef4444" }} />
+                  </div>
+                  <div className="mt-1 flex justify-between text-xs"><span className="text-green-400">Compra {analysis.signal.buy}%</span><span className="text-slate-300">Neutro {analysis.signal.neutral}%</span><span className="text-red-400">Venda {analysis.signal.sell}%</span></div>
+                </div>
+              )}
               <div className="whitespace-pre-wrap rounded-xl border border-white/10 bg-[#0B1A30] p-4 text-sm leading-relaxed text-slate-200" data-testid="pub-report">{analysis.report || "Relatório indisponível."}</div>
               <p className="text-xs text-slate-500">Aviso: análise informativa baseada em dados públicos; não constitui aconselhamento financeiro nem garantia de movimentos futuros.</p>
             </div>

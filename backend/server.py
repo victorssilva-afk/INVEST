@@ -970,6 +970,7 @@ async def crypto_analysis(body: dict, user: dict = Depends(get_current_user)):
     row = market[0] if market else {}
     scores = crypto.compute_scores(ind, fng, stables, glob.get("market_cap_change_24h"))
     report = await crypto.generate_ai_report(symbol, timeframe, ind, scores, row, glob, fng)
+    signal = crypto.signal_distribution(scores["final_score"], scores["confidence"])
     doc = {
         "id": str(uuid.uuid4()), "tenant_id": user["tenant_id"], "asset": symbol,
         "timeframe": timeframe, "technical_score": scores["technical_score"],
@@ -977,13 +978,14 @@ async def crypto_analysis(body: dict, user: dict = Depends(get_current_user)):
         "onchain_score": scores["onchain_score"], "liquidity_score": scores["liquidity_score"],
         "final_score": scores["final_score"], "confidence": scores["confidence"],
         "trend": crypto.trend_label(scores["final_score"]), "indicators": ind,
-        "factors": scores["factors"], "data_notes": scores["data_notes"],
+        "signal": signal, "factors": scores["factors"], "data_notes": scores["data_notes"],
         "report": report, "market": row, "fear_greed": fng,
         "sources": ["CoinGecko", "Alternative.me"] + (["OpenAI GPT-5.4"] if report else []),
         "generated_at": now_iso(),
     }
     await db.crypto_analysis.insert_one(dict(doc))
     doc.pop("_id", None)
+    await _create_prediction(user["tenant_id"], symbol, timeframe, signal, row)
     await log_history("gerou análise", "crypto", symbol, user)
     return doc
 
@@ -1041,6 +1043,67 @@ async def del_watchlist(symbol: str, user: dict = Depends(get_current_user)):
     await db.crypto_watchlist.update_one({"tenant_id": user["tenant_id"]},
                                          {"$set": {"symbols": symbols, "tenant_id": user["tenant_id"]}}, upsert=True)
     return {"symbols": symbols}
+
+
+# ================= CRYPTO — PREVISÕES & AUTO-APRENDIZAGEM =================
+HORIZON_HOURS = {"1h": 1, "4h": 4, "1D": 24, "1W": 168, "1M": 720}
+
+
+async def _create_prediction(tenant_id, symbol, timeframe, signal, market_row):
+    price0 = market_row.get("price") if market_row else None
+    if price0 is None:
+        return
+    target = datetime.now(timezone.utc) + timedelta(hours=HORIZON_HOURS.get(timeframe, 24))
+    await db.crypto_predictions.insert_one({
+        "id": str(uuid.uuid4()), "tenant_id": tenant_id, "symbol": symbol, "timeframe": timeframe,
+        "direction": signal["direction"], "recommendation": signal["recommendation"],
+        "price0": price0, "target_at": target.isoformat(), "status": "pending", "created_at": now_iso()})
+
+
+async def evaluate_predictions():
+    now = datetime.now(timezone.utc).isoformat()
+    due = await db.crypto_predictions.find({"status": "pending", "target_at": {"$lt": now}}).to_list(200)
+    if not due:
+        return
+    try:
+        market = await crypto.get_market(list({p["symbol"] for p in due}))
+        prices = {m["symbol"]: m["price"] for m in market}
+    except Exception:
+        return
+    for p in due:
+        price1 = prices.get(p["symbol"])
+        if price1 is None or not p.get("price0"):
+            continue
+        change = (price1 / p["price0"] - 1) * 100
+        if p["direction"] == "up":
+            correct = change > 0.3
+        elif p["direction"] == "down":
+            correct = change < -0.3
+        else:
+            correct = abs(change) <= 0.5
+        await db.crypto_predictions.update_one({"id": p["id"]}, {"$set": {
+            "status": "correct" if correct else "incorrect", "price1": price1,
+            "change_pct": round(change, 2), "evaluated_at": now_iso()}})
+
+
+@api.get("/crypto/accuracy")
+async def crypto_accuracy(user: dict = Depends(get_current_user)):
+    preds = await db.crypto_predictions.find({"tenant_id": user["tenant_id"]}, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    evaluated = [p for p in preds if p["status"] in ("correct", "incorrect")]
+    correct = [p for p in evaluated if p["status"] == "correct"]
+    from collections import defaultdict
+    bysym = defaultdict(lambda: {"evaluated": 0, "correct": 0})
+    for p in evaluated:
+        bysym[p["symbol"]]["evaluated"] += 1
+        if p["status"] == "correct":
+            bysym[p["symbol"]]["correct"] += 1
+    return {
+        "total": len(preds), "pending": len(preds) - len(evaluated),
+        "evaluated": len(evaluated), "correct": len(correct),
+        "accuracy_pct": round(len(correct) / len(evaluated) * 100) if evaluated else None,
+        "by_symbol": [{"symbol": k, **v, "accuracy_pct": round(v["correct"] / v["evaluated"] * 100) if v["evaluated"] else None} for k, v in bysym.items()],
+        "recent": preds[:12],
+    }
 
 
 # ================= HEALTH & MONITORING =================
@@ -1132,6 +1195,7 @@ async def expiration_scheduler():
                 {"status": "ativo", "payment_friday": {"$lt": today}},
                 {"$set": {"status": "arquivado"}})
             await auto_archive_leads()
+            await evaluate_predictions()
         except Exception as e:
             logger.error(f"scheduler error: {e}")
         await asyncio.sleep(60)
@@ -1462,6 +1526,7 @@ async def public_crypto_analysis(body: dict):
     report = await crypto.generate_ai_report(symbol, timeframe, ind, scores, row, glob, fng)
     return {"asset": symbol, "timeframe": timeframe, **scores,
             "trend": crypto.trend_label(scores["final_score"]), "indicators": ind,
+            "signal": crypto.signal_distribution(scores["final_score"], scores["confidence"]),
             "report": report, "market": row, "fear_greed": fng, "generated_at": now_iso()}
 
 

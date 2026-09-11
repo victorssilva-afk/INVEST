@@ -29,6 +29,8 @@ export default function Crypto() {
   const [news, setNews] = useState([]);
   const [sources, setSources] = useState([]);
   const [newSym, setNewSym] = useState("");
+  const [accuracy, setAccuracy] = useState(null);
+  const loadAccuracy = useCallback(() => { api.get("/crypto/accuracy").then((r) => setAccuracy(r.data)).catch(() => {}); }, []);
 
   const loadMarket = useCallback(() => {
     api.get("/crypto/market").then((r) => setMarket(r.data)).catch((e) => toast.error(apiError(e, "Dados de mercado indisponíveis")));
@@ -38,13 +40,13 @@ export default function Crypto() {
     api.get(`/crypto/assets/${sym}`, { params: { days } }).then((r) => setAsset(r.data)).catch(() => setAsset({ error: true }));
   }, []);
 
-  useEffect(() => { loadMarket(); api.get("/crypto/news").then((r) => setNews(r.data.news)).catch(() => {}); api.get("/crypto/sources").then((r) => setSources(r.data)).catch(() => {}); }, [loadMarket]);
+  useEffect(() => { loadMarket(); loadAccuracy(); api.get("/crypto/news").then((r) => setNews(r.data.news)).catch(() => {}); api.get("/crypto/sources").then((r) => setSources(r.data)).catch(() => {}); }, [loadMarket, loadAccuracy]);
   useEffect(() => { const days = { "1h": "1", "4h": "7", "1D": "30", "1W": "90", "1M": "365" }[tf]; loadAsset(selected, days); }, [selected, tf, loadAsset]);
   useEffect(() => { const t = setInterval(loadMarket, 60000); return () => clearInterval(t); }, [loadMarket]);
 
   const generate = async () => {
     setGenerating(true); setAnalysis(null);
-    try { const { data } = await api.post("/crypto/analysis", { symbol: selected, timeframe: tf }); setAnalysis(data); toast.success("Análise gerada"); }
+    try { const { data } = await api.post("/crypto/analysis", { symbol: selected, timeframe: tf }); setAnalysis(data); loadAccuracy(); toast.success("Análise gerada"); }
     catch (e) { toast.error(apiError(e)); } finally { setGenerating(false); }
   };
   const addWatch = async () => { if (!newSym) return; try { await api.post("/crypto/watchlist", { symbol: newSym.toUpperCase() }); setNewSym(""); loadMarket(); } catch (e) { toast.error(apiError(e)); } };
@@ -135,6 +137,17 @@ export default function Crypto() {
                 <div className="text-sm font-semibold" style={{ color: scoreColor(analysis.final_score) }}>{analysis.trend}</div>
                 <div className="mt-1 text-xs text-slate-400">Confiança: {analysis.confidence}/100</div>
               </div>
+              {analysis.signal && (
+                <div className="rounded-xl border border-slate-200 p-3" data-testid="signal-box">
+                  <div className="mb-2 flex items-center justify-between text-xs"><span className="font-semibold text-[#0B1A30]">Sinal de mercado</span><span className="rounded-full px-2 py-0.5 text-[11px] font-bold" style={{ background: analysis.signal.recommendation === "Compra" ? "#dcfce7" : analysis.signal.recommendation === "Venda" ? "#fee2e2" : "#f1f5f9", color: analysis.signal.recommendation === "Compra" ? "#15803d" : analysis.signal.recommendation === "Venda" ? "#b91c1c" : "#475569" }}>{analysis.signal.recommendation}</span></div>
+                  <div className="flex h-3 overflow-hidden rounded-full">
+                    <div style={{ width: `${analysis.signal.buy}%`, background: "#22c55e" }} />
+                    <div style={{ width: `${analysis.signal.neutral}%`, background: "#cbd5e1" }} />
+                    <div style={{ width: `${analysis.signal.sell}%`, background: "#ef4444" }} />
+                  </div>
+                  <div className="mt-1 flex justify-between text-[11px]"><span className="text-green-600">Compra {analysis.signal.buy}%</span><span className="text-slate-500">Neutro {analysis.signal.neutral}%</span><span className="text-red-600">Venda {analysis.signal.sell}%</span></div>
+                </div>
+              )}
               <div className="grid grid-cols-5 gap-1 text-center text-[10px]">
                 {[["Téc", analysis.technical_score], ["Macro", analysis.macro_score], ["Sent", analysis.sentiment_score], ["Chain", analysis.onchain_score], ["Liq", analysis.liquidity_score]].map(([l, v]) => (
                   <div key={l} className="rounded bg-slate-50 p-1.5"><div className="text-slate-400">{l}</div><div className="font-bold" style={{ color: scoreColor(v) }}>{v > 0 ? "+" : ""}{v}</div></div>
@@ -147,6 +160,23 @@ export default function Crypto() {
           )}
         </Card>
       </div>
+
+      {accuracy && (
+        <Card className="mt-5" data-testid="accuracy-card">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 font-head font-semibold text-[#0B1A30]"><Gauge size={16} className="text-[#D4AF37]" /> Precisão da IA · auto-aprendizagem</div>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <span>Previsões: <b>{accuracy.total}</b></span>
+              <span>Avaliadas: <b>{accuracy.evaluated}</b></span>
+              <span>Acertos: <b className="text-green-600">{accuracy.correct}</b></span>
+              <span>Taxa de acerto: <b className="text-[#0B1A30]">{accuracy.accuracy_pct != null ? `${accuracy.accuracy_pct}%` : "— (a aguardar horizonte)"}</b></span>
+              <span className="text-slate-400">Pendentes: {accuracy.pending}</span>
+            </div>
+          </div>
+          {accuracy.by_symbol?.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{accuracy.by_symbol.map((s) => <span key={s.symbol} className="rounded bg-slate-100 px-2 py-0.5 text-xs">{s.symbol}: {s.accuracy_pct != null ? `${s.accuracy_pct}%` : "—"} ({s.correct}/{s.evaluated})</span>)}</div>}
+          <div className="mt-1 text-[11px] text-slate-400">O sistema regista cada previsão (Compra/Venda/Neutro) e compara com o preço real no fim do horizonte, aprendendo a sua taxa de acerto ao longo do tempo.</div>
+        </Card>
+      )}
 
       {/* Sources + Watchlist + News */}
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
