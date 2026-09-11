@@ -17,6 +17,7 @@ import qrcode
 import io
 import base64
 from openpyxl import Workbook
+from openpyxl.chart import PieChart, Reference
 
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, UploadFile, File, Form, WebSocket, WebSocketDisconnect
 from fastapi.responses import StreamingResponse
@@ -1130,9 +1131,41 @@ async def expiration_scheduler():
             await db.calc_entries.update_many(
                 {"status": "ativo", "payment_friday": {"$lt": today}},
                 {"$set": {"status": "arquivado"}})
+            await auto_archive_leads()
         except Exception as e:
             logger.error(f"scheduler error: {e}")
         await asyncio.sleep(60)
+
+
+async def auto_archive_leads():
+    """No início de um novo mês (horário de Portugal), arquiva o mês anterior de cada utilizador."""
+    current = lisbon_period()
+    state = await db.sys_state.find_one({"_id": "leads_archive"})
+    if state and state.get("last_month") == current:
+        return
+    from datetime import date
+    y, m = int(current[:4]), int(current[5:7])
+    prev = f"{y - 1}-12" if m == 1 else f"{y}-{m - 1:02d}"
+    owners = await db.leads.distinct("owner_id")
+    for oid in owners:
+        lead = await db.leads.find_one({"owner_id": oid})
+        if not lead:
+            continue
+        tid = lead["tenant_id"]
+        exists = await db.lead_archives.find_one({"owner_id": oid, "period": prev})
+        if exists:
+            continue
+        leads = await db.leads.find({"owner_id": oid, "tenant_id": tid}, {"_id": 0}).to_list(5000)
+        month_leads = [x for x in leads if lisbon_period(x.get("created_at")) == prev]
+        if not month_leads:
+            continue
+        await db.lead_archives.update_one(
+            {"owner_id": oid, "tenant_id": tid, "period": prev},
+            {"$set": {"id": str(uuid.uuid4()), "owner_id": oid, "tenant_id": tid, "period": prev,
+                      "label": period_label(prev), "stats": compute_lead_stats(month_leads),
+                      "leads": month_leads, "generated_at": now_iso(), "auto": True}}, upsert=True)
+    await db.sys_state.update_one({"_id": "leads_archive"},
+                                  {"$set": {"last_month": current}}, upsert=True)
 
 
 async def seed():
@@ -1170,31 +1203,165 @@ async def on_shutdown():
 
 # ---------------- Leads (acesso individual por utilizador) ----------------
 LEAD_STATUSES = ["No Answer", "NA Hot", "Not Interested", "Low Potential", "No Potential", "Duplicate"]
+PT_MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
+             "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
 
-@api.get("/leads/stats")
-async def leads_stats(user: dict = Depends(get_current_user)):
-    leads = await db.leads.find({"tenant_id": user["tenant_id"], "owner_id": user["id"]}, {"_id": 0}).to_list(5000)
+def lisbon_period(dtiso=None):
+    from zoneinfo import ZoneInfo
+    tz = ZoneInfo("Europe/Lisbon")
+    if dtiso:
+        try:
+            dt = datetime.fromisoformat(dtiso.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.astimezone(tz)
+        except Exception:
+            dt = datetime.now(tz)
+    else:
+        dt = datetime.now(tz)
+    return dt.strftime("%Y-%m")
+
+
+def period_label(period):
+    try:
+        y, m = period.split("-")
+        return f"{PT_MONTHS[int(m) - 1]} {y}"
+    except Exception:
+        return period
+
+
+def compute_lead_stats(leads):
     from collections import defaultdict
     funnels = defaultdict(lambda: {"count": 0, "value": 0.0})
     affs = defaultdict(lambda: {"count": 0, "value": 0.0})
+    sellers = defaultdict(lambda: {"count": 0, "value": 0.0})
     statuses = defaultdict(int)
     total = 0.0
     for lead in leads:
         v = float(lead.get("value_eur") or 0)
         total += v
-        f = lead.get("funnel") or "—"
-        a = lead.get("affiliate") or "—"
-        funnels[f]["count"] += 1
-        funnels[f]["value"] += v
-        affs[a]["count"] += 1
-        affs[a]["value"] += v
+        f = (lead.get("funnel") or "—").strip() or "—"
+        a = (lead.get("affiliate") or "—").strip() or "—"
+        s = (lead.get("seller") or "—").strip() or "—"
+        funnels[f]["count"] += 1; funnels[f]["value"] += v
+        affs[a]["count"] += 1; affs[a]["value"] += v
+        sellers[s]["count"] += 1; sellers[s]["value"] += v
         statuses[lead.get("status") or "—"] += 1
-    top = lambda d: sorted([{"name": k, **v} for k, v in d.items()], key=lambda x: x["value"], reverse=True)
-    return {"total_leads": len(leads), "total_value": total,
-            "top_funnels": top(funnels)[:10], "top_affiliates": top(affs)[:10],
+    top = lambda d: sorted([{"name": k, **val} for k, val in d.items()], key=lambda x: (x["value"], x["count"]), reverse=True)
+    ta, tf, ts = top(affs), top(funnels), top(sellers)
+    win = lambda arr: (arr[0] if arr else None)
+    return {"total_leads": len(leads), "total_value": round(total, 2),
+            "top_affiliates": ta[:20], "top_funnels": tf[:20], "top_sellers": ts[:20],
             "status_breakdown": [{"status": k, "count": v} for k, v in statuses.items()],
+            "best": {"affiliate": win(ta), "funnel": win(tf), "seller": win(ts)},
             "statuses": LEAD_STATUSES}
+
+
+@api.get("/leads/stats")
+async def leads_stats(user: dict = Depends(get_current_user)):
+    leads = await db.leads.find({"tenant_id": user["tenant_id"], "owner_id": user["id"]}, {"_id": 0}).to_list(5000)
+    return compute_lead_stats(leads)
+
+
+@api.post("/leads/close-month")
+async def close_month(period: str = None, user: dict = Depends(get_current_user)):
+    period = period or lisbon_period()
+    leads = await db.leads.find({"tenant_id": user["tenant_id"], "owner_id": user["id"]}, {"_id": 0}).to_list(5000)
+    month_leads = [lead for lead in leads if lisbon_period(lead.get("created_at")) == period]
+    stats = compute_lead_stats(month_leads)
+    doc = {"id": str(uuid.uuid4()), "tenant_id": user["tenant_id"], "owner_id": user["id"],
+           "period": period, "label": period_label(period), "stats": stats,
+           "leads": month_leads, "generated_at": now_iso()}
+    await db.lead_archives.update_one(
+        {"owner_id": user["id"], "tenant_id": user["tenant_id"], "period": period},
+        {"$set": doc}, upsert=True)
+    doc.pop("_id", None)
+    await log_history("encerrou o mês", "leads", period, user)
+    return doc
+
+
+@api.get("/leads/archives")
+async def list_lead_archives(user: dict = Depends(get_current_user)):
+    return await db.lead_archives.find(
+        {"tenant_id": user["tenant_id"], "owner_id": user["id"]},
+        {"_id": 0, "leads": 0}).sort("period", -1).to_list(60)
+
+
+@api.get("/leads/archives/{period}")
+async def get_lead_archive(period: str, user: dict = Depends(get_current_user)):
+    a = await db.lead_archives.find_one(
+        {"tenant_id": user["tenant_id"], "owner_id": user["id"], "period": period}, {"_id": 0})
+    if not a:
+        raise HTTPException(404, "Não encontrado")
+    return a
+
+
+@api.get("/leads/export")
+async def export_leads(period: str = None, user: dict = Depends(get_current_user)):
+    if period:
+        arch = await db.lead_archives.find_one(
+            {"tenant_id": user["tenant_id"], "owner_id": user["id"], "period": period}, {"_id": 0})
+        leads = arch["leads"] if arch else []
+        stats = arch["stats"] if arch else compute_lead_stats(leads)
+        fname = f"leads_{period}.xlsx"
+    else:
+        leads = await db.leads.find({"tenant_id": user["tenant_id"], "owner_id": user["id"]},
+                                    {"_id": 0}).sort("created_at", -1).to_list(5000)
+        stats = compute_lead_stats(leads)
+        fname = "leads.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Leads"
+    ws.append(["Nome", "Vendedor", "Valor (EUR)", "Affiliate", "Funil", "Tipo", "Status", "Criado (PT)"])
+    for lead in leads:
+        ws.append([lead.get("name", ""), lead.get("seller", ""), float(lead.get("value_eur") or 0),
+                   lead.get("affiliate", ""), lead.get("funnel", ""), lead.get("type", ""),
+                   lead.get("status", ""), (lead.get("created_at", "") or "")[:10]])
+    ws2 = wb.create_sheet("Resumo e Gráficos")
+    state = {"row": 1}
+
+    def section(title, arr):
+        r0 = state["row"]
+        ws2.cell(row=r0, column=1, value=title)
+        hdr = r0 + 1
+        ws2.cell(row=hdr, column=1, value="Nome")
+        ws2.cell(row=hdr, column=2, value="Quantidade")
+        ws2.cell(row=hdr, column=3, value="Valor (EUR)")
+        ds = hdr + 1
+        for it in arr:
+            ws2.cell(row=state_row(ds, arr, it), column=1, value=it["name"])
+        # write rows explicitly
+        rr = ds
+        for it in arr:
+            ws2.cell(row=rr, column=1, value=it["name"])
+            ws2.cell(row=rr, column=2, value=it["count"])
+            ws2.cell(row=rr, column=3, value=round(it["value"], 2))
+            rr += 1
+        de = rr - 1
+        if arr:
+            pie = PieChart()
+            pie.title = title
+            pie.height = 6.5
+            pie.width = 11
+            labels = Reference(ws2, min_col=1, min_row=ds, max_row=de)
+            data = Reference(ws2, min_col=3, min_row=hdr, max_row=de)
+            pie.add_data(data, titles_from_data=True)
+            pie.set_categories(labels)
+            ws2.add_chart(pie, f"E{hdr}")
+        state["row"] = max(rr, hdr + 15) + 2
+
+    def state_row(ds, arr, it):
+        return ds  # placeholder (unused)
+
+    section("Affiliates mais vendidos", stats.get("top_affiliates", []))
+    section("Funis mais vendidos", stats.get("top_funnels", []))
+    section("Vendedores mais vendidos", stats.get("top_sellers", []))
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             headers={"Content-Disposition": f"attachment; filename={fname}"})
 
 
 @api.get("/leads")
