@@ -1,0 +1,44 @@
+{
+  "summary": "Backend: 37/39 pytest passed (95%). Auth, RBAC, dashboard, clients/invoices CRUD, totals compute, next-number+increment, status change, tenant isolation, public emit/upload/proof, uploads, proofs (accept→pago), contracts/templates, reports (CSV+XLSX), history, settings, cálculo (bonus 20%, total, XLSX export), monitor stats, crypto market+watchlist+history+analysis (GPT-5.4) all pass. Frontend: All 11 side-nav modules load without errors; Login flow OK for admin+agente; RBAC hides Utilizadores for agente; Dashboard shows real KPIs & chart; Invoice form opens with FAT-2026-000007 (unique next number); Crypto page loads real prices (BTC $79k, ETH $2.6k, Fear&Greed=56, RSI 76.2, MACD, EMA), watchlist & news; Monitorização WebSocket shows Sistema Online + uptime + live clock + fullscreen-btn; Cálculo empty state works. IBAN validation triggers correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/auth/login", "issue": "Brute-force lockout does NOT accumulate behind Kubernetes ingress. Key uses request.client.host which is the proxy IP (same for every request), so counts should build — but observed 7 consecutive failed attempts all return 401 (never 429). Likely each request lands on a different pod/worker without shared state OR the mongo write is racing. Recommend keying on X-Forwarded-For (client IP header) AND ensure single-writer semantics; also consider capping to 5 in a rolling 15-min window explicitly."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {"flow": "Post-login redirect", "issue": "AuthContext redirects to /app instead of /app/dashboard (spec mentions /dashboard). App still renders dashboard at /app so functional, but wait_for_url('**/dashboard**') fails in automation.", "affected_selectors": []}
+    ],
+    "design_issues": []
+  },
+  "critical_code_review_comments": [
+    "data-testid slugification inconsistency: NavItem generates ids from Portuguese labels with accents stripped, producing awkward ids like nav-an-lise-crypto, nav-c-lculo, nav-monitoriza--o, nav-hist-rico, nav-fotos---documentos, nav-defini--es. E1 documented these as nav-crypto, nav-calculo, nav-monitorizacao. Use explicit stable slugs.",
+    "Invoice item row is missing per-input data-testid attributes for qty, unit_price, discount, vat (only item-desc-0 and remove-item-0 exist). This blocks reliable Playwright testing of totals input.",
+    "add-deposit-btn only exists after a profile is created — its documentation as always-present is misleading. Empty state is fine, just document behavior.",
+    "brute-force limiter should respect X-Forwarded-For behind proxy (see backend_issues.minor).",
+    "server.py is 1163 lines — consider splitting per module (auth, invoices, crypto, calc, monitor) for maintainability.",
+    "CORS is configured with allow_origins='*' from env default; acceptable but production should tighten."
+  ],
+  "test_report_links": [
+    "/app/backend/tests/backend_test.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix brute-force lockout to work behind ingress (use X-Forwarded-For as client identifier).",
+    "Add stable data-testid values on side-nav items (nav-crypto, nav-calculo, nav-monitorizacao, nav-historico, nav-uploads, nav-definicoes, nav-relatorios) — do not derive from accented labels.",
+    "Add data-testid on invoice item inputs: item-qty-{i}, item-price-{i}, item-discount-{i}, item-vat-{i}.",
+    "Consider redirecting successful login to /app/dashboard for spec parity (or update spec)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/backend_test.py"
+  ],
+  "success_rate": {"backend": "95% (37/39)", "frontend": "100% modules loaded"},
+  "test_credentials": "Admin: euapostomesmo@proton.me / Invest2026! ; Agente: agente@invest.pt / Agente2026! (from /app/memory/test_credentials.md)",
+  "seed_data_creation": "Test-generated invoices FAT-2026-000001 through 000007, TEST_ prefixed clients (auto-cleaned by pytest teardown for cliente/perfil), a public upload doc, and one crypto analysis for BTC. All prefixed with TEST_ where applicable.",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest suite at /app/backend/tests/backend_test.py — run via `cd /app && python -m pytest backend/tests/backend_test.py -v`. Only 2 known failing tests remain: brute-force lockout (env limitation w/ proxy IP), and any add-deposit-btn checks require a Cálculo profile to be created first. Nav testids use accent-stripped slugs (nav-an-lise-crypto, nav-c-lculo, nav-monitoriza--o, nav-hist-rico, nav-fotos---documentos, nav-defini--es) — use those or main agent will refactor to stable ids. Login redirect goes to /app not /app/dashboard.",
+  "rca of the issue": "Brute-force lockout RCA: server.py:248 uses `ip = request.client.host if request.client else '?'` as part of key. Behind K8s ingress, request.client.host reflects the ingress/service proxy (or load balancer), not the true remote client. When counter accumulates it may be shared across all requests from that proxy, so effectively works — BUT observed behavior in test was 7 x 401 in a row, suggesting either the counter write is not persisting (unlikely — motor upsert is atomic) or the read/write scheduling in the async loop somehow keeps count<5. Reproduction: `for i in $(seq 1 7); do curl -s -o /dev/null -w '%{http_code}\\n' -X POST $BASE/api/auth/login -H 'content-type: application/json' -d '{\"email\":\"x@example.com\",\"password\":\"y\"}'; done` → all 401. Mitigation: extract client IP from X-Forwarded-For header and enforce lockout on that combined with email; consider also a per-email global lockout to avoid IP-hopping bypass."
+}

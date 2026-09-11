@@ -1,0 +1,101 @@
+{
+  "project_name": "INVEST",
+  "language": "pt-PT",
+  "design_archetype": "Swiss & High-Contrast Performance Pro (Enterprise Luxury Hybrid)",
+  "color_palette": {
+    "navy_dark": "#0B1A30",
+    "navy_card": "#102342",
+    "navy_hover": "#172F54",
+    "gold_primary": "#D4AF37",
+    "gold_accent": "#F3E5AB",
+    "gold_muted": "#8A7322",
+    "background_light": "#F8FAFC",
+    "card_light": "#FFFFFF",
+    "border_light": "#E2E8F0",
+    "text_dark": "#0F172A",
+    "text_muted": "#64748B",
+    "status": {
+      "pendente": { "bg": "#FEF3C7", "text": "#D97706", "border": "#FCD34D" },
+      "pago": { "bg": "#DCFCE7", "text": "#15803D", "border": "#86EFAC" },
+      "expirado": { "bg": "#FEE2E2", "text": "#B91C1C", "border": "#FCA5A5" },
+      "cancelado": { "bg": "#F1F5F9", "text": "#475569", "border": "#CBD5E1" },
+      "analise": { "bg": "#DBEAFE", "text": "#1D4ED8", "border": "#93C5FD" }
+    }
+  },
+  "typography": {
+    "heading_font": "Outfit, sans-serif",
+    "body_font": "Inter, system-ui, -apple-system, sans-serif",
+    "mono_font": "JetBrains Mono, monospace",
+    "scale": {
+      "hero_h1": "text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight",
+      "section_h2": "text-2xl sm:text-3xl lg:text-4xl font-semibold tracking-tight",
+      "subsection_h3": "text-xl sm:text-2xl font-semibold",
+      "card_title": "text-lg font-medium",
+      "body": "text-sm sm:text-base leading-relaxed",
+      "caption": "text-xs tracking-wider uppercase font-medium"
+    }
+  },
+  "image_urls": {
+    "dashboard_hero": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "executive_analytics": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "financial_growth": "https://images.unsplash.com/photo-1608222351212-18fe0ec7b13b?crop=entropy&cs=srgb&fm=jpg&q=85",
+    "system_monitoring": "https://images.unsplash.com/photo-1504868584819-f8e8b4b6d7e3?crop=entropy&cs=srgb&fm=jpg&q=85"
+  },
+  "layout_and_navigation": {
+    "sidebar_width": "w-64 fixed left-0 top-0 bottom-0 bg-[#0B1A30] text-white border-r border-[#172F54] z-40",
+    "main_content": "pl-64 min-h-screen bg-[#F8FAFC] transition-all duration-300",
+    "header": "h-16 border-b border-slate-200 bg-white/80 backdrop-blur-md sticky top-0 z-30 px-8 flex items-center justify-between",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 p-8"
+  },
+  "component_guidelines": {
+    "invoice_issuer": {
+      "format": "FAT-<ano>-<6dígitos> (e.g. FAT-2026-000142)",
+      "modes": ["quick", "detailed"],
+      "pdf_qr": "Include simulated AT QR Code + Portuguese IBAN (PT50...) + Multibanco Reference (Entidade/Referência/Montante)",
+      "due_dates": ["1h", "3h", "1d", "3d", "4d", "5d"]
+    },
+    "comprovativos": {
+      "actions": ["Aceitar", "Rejeitar", "Solicitar Novo Comprovativo"],
+      "upload_page": "Public drag-and-drop secure upload page with receipt preview"
+    },
+    "calculo_module": {
+      "deposit_bonus_rate": 0.20,
+      "formula": "Total = Depósito + (Depósito * 20%)",
+      "friday_detection": "Auto-detect next payment Friday & auto-archive status",
+      "exports": ["PDF", "XLSX"]
+    },
+    "monitorizacao_module": {
+      "always_on": true,
+      "fullscreen_enabled": true,
+      "status_states": ["Online", "Instável", "Reconectando", "Offline"],
+      "live_clock": "Real-time sync timestamp with pulsing status indicator"
+    },
+    "crypto_intelligence_central": {
+      "theme": "Navy #0B1A30 background with gold accents #D4AF37",
+      "widgets": [
+        "Market Ticker (BTC, ETH, SOL, BNB, XRP)",
+        "Fear & Greed Index Gauge",
+        "Technical Indicators (RSI, MACD, EMA, SMA, Bollinger)",
+        "AI Confluence & Confidence Score (0-100%)",
+        "BTC Scenarios (Bullish, Base, Bearish)",
+        "Global Macro (FED, CPI, Interest Rates)",
+        "Bullish/Bearish News Feed with Filters",
+        "Interactive Charting + Watchlist + Comparison"
+      ]
+    }
+  },
+  "instructions_to_main_agent": [
+    "Ensure all text is strictly in PT-PT (Português de Portugal), using terms like 'Faturação', 'Comprovativo', 'Relatórios', 'Monitorização', 'Definições', 'Utilizadores'.",
+    "Use data-testid attributes on ALL interactive elements (buttons, inputs, links, tabs, modals).",
+    "Primary colors must strictly follow #0B1A30 (Navy Dark), #FFFFFF (White), #F8FAFC (Light Gray bg), and #D4AF37 (Gold accent).",
+    "Integrate Lucide-react or Phosphor icons throughout navigation and metrics cards.",
+    "Do NOT use transparent backgrounds for dropdowns, popovers, or headers. Always specify solid or heavy backdrop blur background.",
+    "Ensure responsiveness across desktop, tablet, and mobile displays."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": {
+    "data_testid_requirement": "Mandatory on all clickable, submit, input, tab, and card elements",
+    "theme_rules": "Strictly dark navy #0B1A30 for sidebar & crypto central hero cards; crisp off-white #F8FAFC for dashboard body background; rich gold #D4AF37 for badges, highlights, and primary CTAs.",
+    "font_setup": "Import Outfit and Inter from Google Fonts in public/index.html or index.css.",
+    "export_functionality": "Provide downloadable CSV/XLSX and simulated PDF generation for Invoices, Reports, and Calculation tables."
+  }
+}
