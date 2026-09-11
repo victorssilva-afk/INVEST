@@ -23,9 +23,13 @@ export function validateIban(value) {
 
 export const PT_BANKS_MAIN = [
   "Caixa Geral de Depósitos", "Millennium BCP", "Novo Banco", "Banco Santander Totta",
-  "BPI", "Banco Montepio", "Crédito Agrícola", "Bankinter",
+  "Banco BPI", "Banco Montepio", "Crédito Agrícola", "Bankinter", "Banco CTT",
+  "ActivoBank", "EuroBic", "Banco Best", "Abanca",
 ];
 export const PT_BANKS_OTHER = [
-  "Banco CTT", "ActivoBank", "EuroBic", "Banco BiG", "Banco Invest",
-  "Abanca", "Novo Banco dos Açores", "Banco Atlântico Europa", "Revolut", "N26",
+  "Banco Investimento Global (BiG)", "Banco Primus", "Bison Bank", "CaixaBI",
+  "Deutsche Bank Portugal", "Haitong Bank", "Itaú BBA Europe", "Novo Banco dos Açores",
+  "Openbank", "BBVA Portugal", "BNP Paribas Portugal", "Citibank Europe",
+  "Barclays Bank", "Bank of China", "ICBC (Industrial and Commercial Bank of China)",
+  "N26 Bank", "bunq", "Younited Credit", "Banco do Brasil AG (Sucursal em Portugal)",
 ];
