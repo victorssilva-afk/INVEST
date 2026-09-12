@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { LOGO } from "@/lib/logo";
-import { MonitorUp, ShieldCheck, Loader2 } from "lucide-react";
+import { MonitorUp, ShieldCheck, Loader2, Smartphone, DownloadCloud } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -15,6 +15,11 @@ export default function SuporteCliente() {
   const [status, setStatus] = useState("");
   const [sharing, setSharing] = useState(false);
   const [circle, setCircle] = useState(null);
+  const [deferred, setDeferred] = useState(null);
+  const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
+  const standalone = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+  useEffect(() => { const h = (e) => { e.preventDefault(); setDeferred(e); }; window.addEventListener("beforeinstallprompt", h); return () => window.removeEventListener("beforeinstallprompt", h); }, []);
+  const install = async () => { if (deferred) { deferred.prompt(); await deferred.userChoice; setDeferred(null); } };
 
   useEffect(() => () => { stop(); }, []); // cleanup on unmount
 
@@ -72,7 +77,13 @@ export default function SuporteCliente() {
               <h1 className="mt-4 font-head text-2xl font-bold">Iniciar partilha de ecrã</h1>
               <p className="mt-2 text-sm text-slate-300">O nosso técnico vai poder ver o seu ecrã para o ajudar. Vai continuar com o controlo total e pode parar quando quiser.</p>
               <button onClick={start} data-testid="cliente-share-btn" className="mt-6 w-full rounded-lg gold-gradient py-4 text-lg font-bold text-[#0B1A30]">Partilhar o meu ecrã</button>
-              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-500"><ShieldCheck size={14} /> Ligação segura · sem instalação</p>
+              {isAndroid && !standalone && (
+                <button onClick={install} data-testid="cliente-install-btn" className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-white/10 py-3 font-semibold text-white hover:bg-white/20">
+                  <Smartphone size={16} /> {deferred ? "Instalar a App no Android" : "Instalar App (menu ⋮ → Instalar aplicação)"}
+                </button>
+              )}
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-500"><ShieldCheck size={14} /> Ligação segura · a App Android instala-se e atualiza-se sozinha</p>
+              <p className="mt-1 flex items-center justify-center gap-1.5 text-[11px] text-slate-500"><DownloadCloud size={12} /> Ver ecrã: já funciona. Controlo remoto de toques exige a App nativa (Acessibilidade).</p>
             </>
           ) : (
             <>

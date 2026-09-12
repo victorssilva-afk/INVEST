@@ -1,0 +1,16 @@
+{
+  "short_name": "Crypto.Invest",
+  "name": "Crypto.Invest — Suporte Remoto",
+  "icons": [
+    { "src": "favicon.ico", "sizes": "64x64 32x32 24x24 16x16", "type": "image/x-icon" },
+    { "src": "logo-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
+    { "src": "logo-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
+  ],
+  "start_url": ".",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#0B1A30",
+  "background_color": "#0B1A30",
+  "description": "Suporte técnico remoto Crypto.Invest — partilha de ecrã"
+}
