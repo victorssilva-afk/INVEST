@@ -7,6 +7,13 @@ import { MonitorUp, ShieldCheck, Loader2, Smartphone, Monitor, Download } from "
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
 const WIN_APP_URL = process.env.REACT_APP_WINDOWS_APP_URL || "";
+const APK_APP_URL = process.env.REACT_APP_ANDROID_APP_URL || "";
+
+function triggerDownload(url) {
+  const a = document.createElement("a");
+  a.href = url; a.rel = "noopener"; a.target = "_self";
+  document.body.appendChild(a); a.click(); a.remove();
+}
 
 export default function SuporteCliente() {
   const { code } = useParams();
@@ -25,6 +32,7 @@ export default function SuporteCliente() {
   useEffect(() => { const h = (e) => { e.preventDefault(); setDeferred(e); }; window.addEventListener("beforeinstallprompt", h); return () => window.removeEventListener("beforeinstallprompt", h); }, []);
 
   const install = async () => {
+    if (APK_APP_URL) { triggerDownload(APK_APP_URL); setShowHelp(true); return; }
     if (deferred) {
       deferred.prompt();
       const r = await deferred.userChoice;
@@ -35,8 +43,8 @@ export default function SuporteCliente() {
     }
   };
   const installWindows = () => {
-    if (WIN_APP_URL) { window.open(WIN_APP_URL, "_blank"); return; }
-    if (deferred) { install(); return; }
+    if (WIN_APP_URL) { triggerDownload(WIN_APP_URL); setShowHelp(true); return; }
+    if (deferred) { deferred.prompt(); deferred.userChoice.then(() => setDeferred(null)); return; }
     setShowHelp(true);
   };
 
@@ -126,7 +134,9 @@ export default function SuporteCliente() {
               )}
               {showHelp && (
                 <div className="mt-3 rounded-lg border border-green-400/30 bg-green-500/10 p-3 text-left text-xs text-slate-200" data-testid="install-help">
-                  Para instalar: toque no menu <b>⋮</b> do navegador e escolha <b>“Instalar aplicação”</b> ou <b>“Adicionar ao ecrã principal”</b>.
+                  {APK_APP_URL
+                    ? <>O <b>APK está a descarregar</b>. Quando terminar, abra o ficheiro e toque em <b>Instalar</b>. Se pedir, ative <b>“Permitir desta origem”</b> nas definições do Android.</>
+                    : <>Para instalar: toque no menu <b>⋮</b> do navegador e escolha <b>“Instalar aplicação”</b> ou <b>“Adicionar ao ecrã principal”</b>.</>}
                 </div>
               )}
               <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-500"><ShieldCheck size={14} /> Ligação segura · pode parar a partilha quando quiser</p>
@@ -141,9 +151,11 @@ export default function SuporteCliente() {
                   <button onClick={installWindows} data-testid="cliente-install-windows-btn" className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-green-500 py-3.5 text-base font-bold text-white shadow-lg hover:bg-green-600 active:scale-[0.98] transition-transform">
                     {WIN_APP_URL ? <Download size={18} /> : <Monitor size={18} />} Instalar aplicação (Windows)
                   </button>
-                  {showHelp && !WIN_APP_URL && (
+                  {showHelp && (
                     <div className="mt-2 rounded-lg border border-green-400/30 bg-green-500/10 p-3 text-left text-xs text-slate-200" data-testid="install-help-win">
-                      Para instalar como app: clique no ícone <b>⊕</b> na barra de endereço do Chrome/Edge e escolha <b>“Instalar”</b>. A app abre numa janela própria.
+                      {WIN_APP_URL
+                        ? <>O <b>instalador está a descarregar</b>. Quando terminar, abra o ficheiro <b>Crypto.Invest-Setup.exe</b> e siga os passos. Se o Windows avisar, clique em <b>“Mais informações → Executar mesmo assim”</b>.</>
+                        : <>Para instalar como app: clique no ícone <b>⊕</b> na barra de endereço do Chrome/Edge e escolha <b>“Instalar”</b>.</>}
                     </div>
                   )}
                 </>

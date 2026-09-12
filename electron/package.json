@@ -13,6 +13,7 @@
     "productName": "Crypto.Invest",
     "files": ["main.js", "package.json"],
     "win": { "target": ["nsis"] },
+    "nsis": { "artifactName": "Crypto.Invest-Setup.${ext}", "oneClick": true, "perMachine": false },
     "mac": { "target": ["dmg"] },
     "linux": { "target": ["AppImage"] }
   },

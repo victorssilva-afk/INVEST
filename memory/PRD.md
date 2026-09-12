@@ -42,6 +42,13 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Cliente Windows: após COMEÇAR, botão "Instalar aplicação (Windows)" — usa REACT_APP_WINDOWS_APP_URL (.exe) se definido, senão PWA/instruções.
 - Testado: endpoints via curl (criar agente, atribuir, renomear, isolamento, RBAC); UI via screenshot (prévia AO VIVO confirmada em sessão real).
 
+## Downloads diretos APK/.exe (2026-09-12)
+- Botões do cliente descarregam já o ficheiro ao clicar (anchor → URL da Release GitHub).
+- Repo: victorssilva-afk/INVEST. Links: /releases/download/latest/Crypto.Invest.apk e /Crypto.Invest-Setup.exe.
+- Workflows android.yml/windows.yml agora publicam artefactos numa Release tag `latest` (softprops/action-gh-release@v2, permissions contents:write).
+- electron/package.json: nsis oneClick + artifactName fixo Crypto.Invest-Setup.exe.
+- IMPORTANTE: links só funcionam DEPOIS de correr os workflows (criam a Release). Browser não instala silenciosamente: descarrega e o utilizador confirma (Android: permitir origem desconhecida; Windows: executar .exe).
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").
