@@ -13,7 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
       - uses: actions/setup-java@v5
-        with: { distribution: "temurin", java-version: "17" }
+        with: { distribution: "temurin", java-version: "21" }
 
       - name: Build web (thin shell)
         working-directory: frontend
@@ -38,11 +38,15 @@ jobs:
         run: |
           APP=frontend/android/app/src/main
           PKG=$APP/java/pt/invest/cryptoinvest
-          mkdir -p $PKG $APP/res/xml
+          mkdir -p $PKG $APP/res/xml $APP/res/values
           cp native/android/RemoteControlService.kt $PKG/RemoteControlService.kt
           cp native/android/accessibility_service_config.xml $APP/res/xml/accessibility_service_config.xml
-          echo '>> Agora aplique manualmente native/android/manifest_additions.xml ao AndroidManifest.xml,'
-          echo '>> adicione a string accessibility_desc e a dependência okhttp em app/build.gradle (ver README).'
+          # 1) string accessibility_desc (corrige AAPT resource not found)
+          sed -i 's#</resources>#    <string name="accessibility_desc">Permite ao tecnico Crypto.Invest ver e controlar o ecra para dar suporte remoto.</string>\n</resources>#' $APP/res/values/strings.xml
+          # 2) dependencia okhttp (necessaria pelo RemoteControlService.kt)
+          sed -i 's#dependencies {#dependencies {\n    implementation("com.squareup.okhttp3:okhttp:4.12.0")#' frontend/android/app/build.gradle
+          # 3) registar o AccessibilityService no manifest
+          sed -i 's#</application>#    <service android:name=".RemoteControlService" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" android:exported="false"><intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter><meta-data android:name="android.accessibilityservice" android:resource="@xml/accessibility_service_config" /></service>\n</application>#' $APP/AndroidManifest.xml
 
       - name: Build APK (debug)
         working-directory: frontend/android
