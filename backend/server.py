@@ -1549,10 +1549,24 @@ async def support_ice():
     return {"iceServers": ICE_SERVERS}
 
 
+@api.get("/support/agents")
+async def support_agents(user: dict = Depends(require_roles("admin"))):
+    return await db.users.find(
+        {"tenant_id": user["tenant_id"], "role": {"$in": ["agente", "admin"]}},
+        {"_id": 0, "id": 1, "name": 1, "email": 1, "role": 1}).to_list(500)
+
+
 @api.post("/support/sessions")
-async def create_support_session(client_name: str = "", user: dict = Depends(get_current_user)):
+async def create_support_session(client_name: str = "", assigned_to: str = "", user: dict = Depends(get_current_user)):
+    aid, aname = user["id"], user["name"]
+    if assigned_to and user["role"] == "admin":
+        target = await db.users.find_one({"id": assigned_to, "tenant_id": user["tenant_id"]}, {"_id": 0})
+        if not target:
+            raise HTTPException(404, "Agente não encontrado")
+        aid, aname = target["id"], target["name"]
     doc = {"id": str(uuid.uuid4()), "code": uuid.uuid4().hex[:8], "tenant_id": user["tenant_id"],
-           "owner_id": user["id"], "owner_name": user["name"], "client_name": client_name,
+           "owner_id": user["id"], "owner_name": user["name"], "assigned_to": aid, "assigned_name": aname,
+           "client_name": client_name, "device_name": client_name or "Aparelho",
            "status": "waiting", "created_at": now_iso(), "ended_at": None}
     await db.support_sessions.insert_one(dict(doc))
     doc.pop("_id", None)
@@ -1561,15 +1575,49 @@ async def create_support_session(client_name: str = "", user: dict = Depends(get
 
 @api.get("/support/sessions")
 async def list_support_sessions(user: dict = Depends(get_current_user)):
-    return await db.support_sessions.find(
-        {"tenant_id": user["tenant_id"], "owner_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
+    if user["role"] == "admin":
+        q = {"tenant_id": user["tenant_id"]}
+    else:
+        q = {"tenant_id": user["tenant_id"], "$or": [{"owner_id": user["id"]}, {"assigned_to": user["id"]}]}
+    return await db.support_sessions.find(q, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+async def _session_for_user(code: str, user: dict) -> dict:
+    q = {"code": code, "tenant_id": user["tenant_id"]}
+    if user["role"] != "admin":
+        q["$or"] = [{"owner_id": user["id"]}, {"assigned_to": user["id"]}]
+    s = await db.support_sessions.find_one(q, {"_id": 0})
+    if not s:
+        raise HTTPException(404, "Sessão não encontrada")
+    return s
 
 
 @api.post("/support/sessions/{code}/end")
 async def end_support_session(code: str, user: dict = Depends(get_current_user)):
+    await _session_for_user(code, user)
     await db.support_sessions.update_one(
-        {"code": code, "owner_id": user["id"], "tenant_id": user["tenant_id"]},
+        {"code": code, "tenant_id": user["tenant_id"]},
         {"$set": {"status": "ended", "ended_at": now_iso()}})
+    return {"ok": True}
+
+
+@api.patch("/support/sessions/{code}/rename")
+async def rename_support_session(code: str, device_name: str = "", user: dict = Depends(get_current_user)):
+    await _session_for_user(code, user)
+    await db.support_sessions.update_one(
+        {"code": code, "tenant_id": user["tenant_id"]},
+        {"$set": {"device_name": (device_name or "Aparelho").strip()[:60]}})
+    return {"ok": True}
+
+
+@api.post("/support/sessions/{code}/assign")
+async def assign_support_session(code: str, assigned_to: str = "", user: dict = Depends(require_roles("admin"))):
+    target = await db.users.find_one({"id": assigned_to, "tenant_id": user["tenant_id"]}, {"_id": 0})
+    if not target:
+        raise HTTPException(404, "Agente não encontrado")
+    await db.support_sessions.update_one(
+        {"code": code, "tenant_id": user["tenant_id"]},
+        {"$set": {"assigned_to": target["id"], "assigned_name": target["name"]}})
     return {"ok": True}
 
 
