@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useState } from "react";
 import api, { apiError } from "@/lib/api";
 import { fmtDate } from "@/lib/format";

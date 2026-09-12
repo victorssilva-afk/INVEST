@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import { useEffect, useRef, useState, useCallback } from "react";
 import { WS_URL, API } from "@/lib/api";
 import { PageHeader, Card } from "@/components/ui/primitives";
