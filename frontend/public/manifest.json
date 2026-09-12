@@ -6,11 +6,11 @@
     { "src": "logo-192.png", "type": "image/png", "sizes": "192x192", "purpose": "any maskable" },
     { "src": "logo-512.png", "type": "image/png", "sizes": "512x512", "purpose": "any maskable" }
   ],
-  "start_url": ".",
+  "start_url": "/conectar",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#0B1A30",
-  "background_color": "#0B1A30",
+  "theme_color": "#171A1F",
+  "background_color": "#171A1F",
   "description": "Suporte técnico remoto Crypto.Invest — partilha de ecrã"
 }

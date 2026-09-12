@@ -58,6 +58,17 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Fluxo antigo por link /suporte/{code} mantido para casos iniciados pelo técnico.
 - Testado por curl (connect idempotente por device, listagem no CRM, delete) + screenshot da página /conectar.
 
+## App Android NATIVA (2026-09-12)
+- Projeto Kotlin em /app/android-native (Gradle 8.9 / AGP 8.5.2 / Kotlin 1.9.24, minSdk24/target34).
+- Ecrã único (logo B verde + botão CONECTAR + status). Regista dispositivo via POST /api/public/support/connect (device_id em SharedPreferences).
+- Partilha de ecrã REAL: MediaProjection + FGS type mediaProjection + WebRTC nativo (io.getstream:stream-webrtc-android:1.3.10) → stream para o técnico (mesmo protocolo WS offer/answer/ice do viewer web).
+- Controlo remoto: RemoteControlService (AccessibilityService) executa toque (dispatchGesture tap), deslize (swipe) e TECLADO (ACTION_SET_TEXT no campo focado). Comandos chegam pelo mesmo WS via ScreenShareService.
+- Acessibilidade: app pede ao utilizador para ativar 1x nas Definições (obrigatório no Android).
+- Ícones launcher gerados (mipmaps) + tema dark.
+- Workflow .github/workflows/android-native.yml (setup-android + gradle) compila e publica Crypto.Invest.apk na Release latest. Workflow Capacitor antigo (android.yml) REMOVIDO.
+- BuildConfig.BACKEND_URL fixo ao preview — mudar se domínio de produção mudar.
+- NÃO testado/compilado no container (sem Android SDK): precisa de correr no GitHub Actions e ser testado em telemóvel real. Preview do CRM (snapshots) não aparece para clientes nativos; técnico vê vídeo ao abrir a sessão.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").

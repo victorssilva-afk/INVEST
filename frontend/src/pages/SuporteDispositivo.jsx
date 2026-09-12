@@ -49,6 +49,8 @@ export default function SuporteDispositivo() {
   const [circle, setCircle] = useState(null);
   const [deferred, setDeferred] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [unsupported, setUnsupported] = useState(false);
+  const canShare = typeof navigator !== "undefined" && navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === "function";
   const isAndroid = /android/i.test(navigator.userAgent);
   const isWindows = /windows/i.test(navigator.userAgent);
   const isNative = typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.();
@@ -86,6 +88,7 @@ export default function SuporteDispositivo() {
   };
 
   const connect = async () => {
+    if (!canShare) { setUnsupported(true); return; }
     setConnecting(true); setStatus("A preparar ligação…");
     let code;
     try {
@@ -95,7 +98,13 @@ export default function SuporteDispositivo() {
 
     let stream;
     try { stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }); }
-    catch (e) { setConnecting(false); setStatus("Partilha cancelada."); return; }
+    catch (e) {
+      setConnecting(false);
+      setStatus(e && e.name === "NotAllowedError"
+        ? "Partilha cancelada. Toque em CONECTAR e escolha “Partilhar” / “Iniciar agora”."
+        : "Não foi possível partilhar o ecrã neste dispositivo.");
+      return;
+    }
     streamRef.current = stream;
 
     let ice = [{ urls: "stun:stun.l.google.com:19302" }];
@@ -151,6 +160,11 @@ export default function SuporteDispositivo() {
                 {connecting ? <Loader2 size={22} className="animate-spin" /> : <Wifi size={22} />} {connecting ? "A LIGAR…" : "CONECTAR"}
               </button>
               {status && <div className="mt-3 text-sm text-slate-300" data-testid="conectar-status">{status}</div>}
+              {unsupported && (
+                <div className="mt-4 rounded-lg border border-amber-400/30 bg-amber-500/10 p-3 text-left text-xs text-amber-100" data-testid="share-unsupported">
+                  <b>Este telemóvel não permite partilhar o ecrã pelo navegador.</b> A partilha de ecrã do Android exige a <b>App nativa</b> (com permissão de captura de ecrã e Acessibilidade). Num <b>computador</b> (Chrome/Edge no Windows) a partilha funciona já aqui: abra esta página e toque em CONECTAR.
+                </div>
+              )}
               {!isNative && isAndroid && !standalone && (
                 <button onClick={install} data-testid="cliente-install-btn" className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-green-500 py-3.5 text-lg font-bold text-white shadow-lg hover:bg-green-600 active:scale-[0.98] transition-transform">
                   <Smartphone size={18} /> INSTALAR APP
