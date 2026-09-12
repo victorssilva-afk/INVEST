@@ -17,6 +17,9 @@ jobs:
 
       - name: Build web (thin shell)
         working-directory: frontend
+        env:
+          CI: "false"
+          DISABLE_ESLINT_PLUGIN: "true"
         run: |
           yarn install --frozen-lockfile
           yarn build

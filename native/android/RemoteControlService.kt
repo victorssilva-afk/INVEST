@@ -3,9 +3,11 @@ package pt.invest.cryptoinvest
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.graphics.Path
+import android.os.Bundle
 import android.util.DisplayMetrics
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import okhttp3.*
 import org.json.JSONObject
 
@@ -38,7 +40,10 @@ class RemoteControlService : AccessibilityService() {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 try {
                     val m = JSONObject(text)
-                    if (m.optString("type") == "gesture") handleGesture(m)
+                    when (m.optString("type")) {
+                        "gesture" -> handleGesture(m)
+                        "text" -> handleText(m)
+                    }
                 } catch (_: Exception) {}
             }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
@@ -73,6 +78,14 @@ class RemoteControlService : AccessibilityService() {
             path.moveTo(x, y); path.lineTo(x + 1f, y + 1f)
             dispatch(path, 60L)
         }
+    }
+
+    private fun handleText(m: JSONObject) {
+        // Escreve no campo focado do cliente (teclado remoto)
+        val node = findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return
+        val args = Bundle()
+        args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, m.optString("value"))
+        node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
     }
 
     private fun dispatch(path: Path, duration: Long) {

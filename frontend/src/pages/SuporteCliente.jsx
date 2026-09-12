@@ -46,28 +46,33 @@ export default function SuporteCliente() {
     pcRef.current = pc;
     stream.getTracks().forEach((t) => pc.addTrack(t, stream));
     pc.onicecandidate = (e) => { if (e.candidate) send({ type: "ice", candidate: e.candidate }); };
-    const ws = new WebSocket(`${WSB}/support/${code}?role=client`);
-    wsRef.current = ws;
-    let offered = false;
-    const makeOffer = async () => {
-      if (offered) return; offered = true;
-      const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
-      send({ type: "offer", sdp: offer }); setStatus("A ligar ao técnico…");
+    const connectWs = () => {
+      const ws = new WebSocket(`${WSB}/support/${code}?role=client`);
+      wsRef.current = ws;
+      let offered = false;
+      const makeOffer = async () => {
+        offered = true;
+        const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
+        send({ type: "offer", sdp: offer }); setStatus("A ligar ao técnico…");
+      };
+      ws.onopen = () => { setStatus("A partilhar. À espera do técnico…"); if (pc.currentRemoteDescription === null && offered) makeOffer(); };
+      ws.onmessage = async (ev) => {
+        const m = JSON.parse(ev.data);
+        if (m.type === "peer-joined" && m.role === "tech") makeOffer();
+        else if (m.type === "answer") { await pc.setRemoteDescription(m.sdp); setStatus("Ligado ao técnico ✓"); }
+        else if (m.type === "ice" && m.candidate) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
+        else if (m.type === "circle") { setCircle({ x: m.x, y: m.y, k: Date.now() }); }
+      };
+      ws.onclose = () => { if (streamRef.current) { setStatus("Ligação perdida. A reconectar…"); setTimeout(connectWs, 2000); } };
     };
-    ws.onopen = () => setStatus("A partilhar. À espera do técnico…");
-    ws.onmessage = async (ev) => {
-      const m = JSON.parse(ev.data);
-      if (m.type === "peer-joined" && m.role === "tech") makeOffer();
-      else if (m.type === "answer") { await pc.setRemoteDescription(m.sdp); setStatus("Ligado ao técnico ✓"); }
-      else if (m.type === "ice" && m.candidate) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
-      else if (m.type === "circle") { setCircle({ x: m.x, y: m.y, k: Date.now() }); }
-    };
+    connectWs();
     stream.getVideoTracks()[0].onended = () => stop();
     setSharing(true);
   };
 
   const stop = () => {
-    try { streamRef.current?.getTracks().forEach((t) => t.stop()); } catch (e) { /* */ }
+    const s = streamRef.current; streamRef.current = null;
+    try { s?.getTracks().forEach((t) => t.stop()); } catch (e) { /* */ }
     try { pcRef.current?.close(); } catch (e) { /* */ }
     try { wsRef.current?.close(); } catch (e) { /* */ }
     setSharing(false); setStatus("Partilha terminada.");
@@ -84,9 +89,9 @@ export default function SuporteCliente() {
           {!sharing ? (
             <>
               <MonitorUp size={44} className="mx-auto text-[#D4AF37]" />
-              <h1 className="mt-4 font-head text-2xl font-bold">Iniciar partilha de ecrã</h1>
-              <p className="mt-2 text-sm text-slate-300">O nosso técnico vai poder ver o seu ecrã para o ajudar. Vai continuar com o controlo total e pode parar quando quiser.</p>
-              <button onClick={start} data-testid="cliente-share-btn" className="mt-6 w-full rounded-lg gold-gradient py-4 text-lg font-bold text-[#0B1A30]">Partilhar o meu ecrã</button>
+              <h1 className="mt-4 font-head text-2xl font-bold">Suporte Crypto.Invest</h1>
+              <p className="mt-2 text-sm text-slate-300">Toque em <b>COMEÇAR</b> e aceite as permissões. O técnico poderá ver o seu ecrã e ajudá-lo. Pode parar quando quiser.</p>
+              <button onClick={start} data-testid="cliente-share-btn" className="mt-6 w-full rounded-lg gold-gradient py-4 text-xl font-extrabold text-[#0B1A30]">COMEÇAR</button>
               {isAndroid && !standalone && (
                 <button onClick={install} data-testid="cliente-install-btn" className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-green-500 py-4 text-lg font-bold text-white shadow-lg hover:bg-green-600 active:scale-[0.98] transition-transform">
                   <Smartphone size={18} /> INSTALAR APP

@@ -47,6 +47,7 @@ export default function CryptoInvestViewer() {
     return () => { closed = true; try { wsRef.current?.close(); } catch (e) { /* */ } try { pcRef.current?.close(); } catch (e) { /* */ } };
   }, [code]);
 
+  const [txt, setTxt] = useState("");
   const downRef = useRef(null);
   const send = (m) => { try { wsRef.current?.readyState === 1 && wsRef.current.send(JSON.stringify(m)); } catch (er) { /* */ } };
   const norm = (e) => { const r = videoRef.current.getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }; };
@@ -72,6 +73,10 @@ export default function CryptoInvestViewer() {
       </header>
       <main className="mx-auto max-w-6xl p-4">
         <div className="mb-2 flex items-center gap-2 text-xs text-slate-400"><MousePointerClick size={14} /> Clique = toque · arraste = deslizar (swipe) no ecrã do cliente (requer a App Android com Acessibilidade ativa).</div>
+        <div className="mb-3 flex gap-2">
+          <input value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && txt) { send({ type: "text", value: txt }); setTxt(""); } }} placeholder="Escrever no dispositivo do cliente (teclado remoto)…" data-testid="ci-text-input" className="flex-1 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500" />
+          <button onClick={() => { if (txt) { send({ type: "text", value: txt }); setTxt(""); } }} data-testid="ci-text-send" className="rounded-lg gold-gradient px-4 py-2 text-sm font-bold text-[#0B1A30]">Enviar texto</button>
+        </div>
         <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
           <video ref={videoRef} autoPlay playsInline muted onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} className="h-[70vh] w-full cursor-crosshair touch-none bg-black object-contain" data-testid="ci-remote-video" />
         </div>
