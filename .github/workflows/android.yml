@@ -6,7 +6,7 @@ on:
     tags: ["v*"]
 
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,23 +15,31 @@ jobs:
       - uses: actions/setup-java@v4
         with: { distribution: "temurin", java-version: "17" }
 
-      - name: Install frontend deps
-        working-directory: frontend
-        run: yarn install --frozen-lockfile
-
       - name: Build web (thin shell)
         working-directory: frontend
-        run: yarn build
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
 
-      - name: Install Capacitor
+      - name: Capacitor add Android
+        working-directory: frontend
         run: |
           npm i -g @capacitor/cli
-          cd frontend
           yarn add @capacitor/core @capacitor/android
           npx cap init "Crypto.Invest" pt.invest.cryptoinvest --web-dir build || true
           cp ../capacitor.config.json ./capacitor.config.json
           npx cap add android
           npx cap sync android
+
+      - name: Inject native RemoteControlService (Acessibilidade)
+        run: |
+          APP=frontend/android/app/src/main
+          PKG=$APP/java/pt/invest/cryptoinvest
+          mkdir -p $PKG $APP/res/xml
+          cp native/android/RemoteControlService.kt $PKG/RemoteControlService.kt
+          cp native/android/accessibility_service_config.xml $APP/res/xml/accessibility_service_config.xml
+          echo '>> Agora aplique manualmente native/android/manifest_additions.xml ao AndroidManifest.xml,'
+          echo '>> adicione a string accessibility_desc e a dependência okhttp em app/build.gradle (ver README).'
 
       - name: Build APK (debug)
         working-directory: frontend/android

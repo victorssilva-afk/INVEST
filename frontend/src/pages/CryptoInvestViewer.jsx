@@ -47,10 +47,20 @@ export default function CryptoInvestViewer() {
     return () => { closed = true; try { wsRef.current?.close(); } catch (e) { /* */ } try { pcRef.current?.close(); } catch (e) { /* */ } };
   }, [code]);
 
-  const sendCircle = (e) => {
-    const r = videoRef.current.getBoundingClientRect();
-    const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-    try { wsRef.current?.readyState === 1 && wsRef.current.send(JSON.stringify({ type: "circle", x, y })); } catch (er) { /* */ }
+  const downRef = useRef(null);
+  const send = (m) => { try { wsRef.current?.readyState === 1 && wsRef.current.send(JSON.stringify(m)); } catch (er) { /* */ } };
+  const norm = (e) => { const r = videoRef.current.getBoundingClientRect(); return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) }; };
+  const sendCircle = (e) => { const p = norm(e); send({ type: "circle", x: p.x, y: p.y }); };
+  const onDown = (e) => { downRef.current = { ...norm(e), t: Date.now() }; sendCircle(e); };
+  const onMove = (e) => { sendCircle(e); };
+  const onUp = (e) => {
+    const s = downRef.current; if (!s) return; const p = norm(e);
+    const dist = Math.hypot(p.x - s.x, p.y - s.y);
+    const dur = Math.min(1500, Math.max(120, Date.now() - s.t));
+    send(dist > 0.03
+      ? { type: "gesture", action: "swipe", x: s.x, y: s.y, x2: p.x, y2: p.y, duration: dur }
+      : { type: "gesture", action: "tap", x: p.x, y: p.y });
+    downRef.current = null;
   };
 
   return (
@@ -61,9 +71,9 @@ export default function CryptoInvestViewer() {
         <span className="flex items-center gap-1.5 text-xs text-slate-400"><Circle size={10} className="text-red-500" /> {status}</span>
       </header>
       <main className="mx-auto max-w-6xl p-4">
-        <div className="mb-2 flex items-center gap-2 text-xs text-slate-400"><MousePointerClick size={14} /> Mova o rato sobre o ecrã para desenhar o círculo vermelho no ecrã do cliente.</div>
+        <div className="mb-2 flex items-center gap-2 text-xs text-slate-400"><MousePointerClick size={14} /> Clique = toque · arraste = deslizar (swipe) no ecrã do cliente (requer a App Android com Acessibilidade ativa).</div>
         <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
-          <video ref={videoRef} autoPlay playsInline muted onMouseMove={sendCircle} onClick={sendCircle} className="h-[70vh] w-full cursor-crosshair bg-black object-contain" data-testid="ci-remote-video" />
+          <video ref={videoRef} autoPlay playsInline muted onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} className="h-[70vh] w-full cursor-crosshair touch-none bg-black object-contain" data-testid="ci-remote-video" />
         </div>
       </main>
     </div>
