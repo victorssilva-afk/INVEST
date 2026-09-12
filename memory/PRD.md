@@ -69,6 +69,10 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - BuildConfig.BACKEND_URL fixo ao preview — mudar se domínio de produção mudar.
 - NÃO testado/compilado no container (sem Android SDK): precisa de correr no GitHub Actions e ser testado em telemóvel real. Preview do CRM (snapshots) não aparece para clientes nativos; técnico vê vídeo ao abrir a sessão.
 
+- CORREÇÃO build #1 (2026-09-12): removida dependência org.json (duplicate class com Android framework → dex fail) e corrigida null-safety Kotlin (surfaceHelper!!, videoSource!!, videoTrack!!) + OkHttp 4 toRequestBody/toMediaTypeOrNull. setup-gradle 8.9 confirmado a funcionar.
+
+- VALIDAÇÃO (2026-09-12): instalado JDK17+SDK34+gradle8.9 no container; build parou no aapt2 APENAS por ser arm64 (aapt2 é x86_64) — não é bug de código; GitHub runner x86_64 corre aapt2 OK. Compilei ScreenShareService.kt + RemoteControlService.kt com kotlinc 1.9.24 contra libs reais (stream-webrtc 1.3.10, okhttp 4.12, androidx.core, android.jar): exit=0, 0 erros. SDK removido de /app; adicionado android-native/.gitignore.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").

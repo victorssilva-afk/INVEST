@@ -19,6 +19,8 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import org.webrtc.*
@@ -91,7 +93,7 @@ class ScreenShareService : Service() {
         val body = JSONObject().put("device_id", devId).put("device_name", name).toString()
         val req = Request.Builder()
             .url("${BuildConfig.BACKEND_URL}/api/public/support/connect")
-            .post(okhttp3.RequestBody.create("application/json".let { okhttp3.MediaType.parse(it) }, body))
+            .post(body.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()))
             .build()
         http.newCall(req).execute().use { resp: Response ->
             val txt = resp.body?.string() ?: "{}"
@@ -140,14 +142,14 @@ class ScreenShareService : Service() {
         capturer = ScreenCapturerAndroid(permissionData, mpCallback)
         surfaceHelper = SurfaceTextureHelper.create("CaptureThread", eglBase.eglBaseContext)
         videoSource = factory!!.createVideoSource(true)
-        capturer!!.initialize(surfaceHelper, applicationContext, videoSource!!.capturerObserver)
+        capturer!!.initialize(surfaceHelper!!, applicationContext, videoSource!!.capturerObserver)
 
         val metrics = DisplayMetrics()
         (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
         val w = if (metrics.widthPixels > 0) metrics.widthPixels else 720
         val h = if (metrics.heightPixels > 0) metrics.heightPixels else 1280
         capturer!!.startCapture(w, h, 20)
-        videoTrack = factory!!.createVideoTrack("SCREEN", videoSource)
+        videoTrack = factory!!.createVideoTrack("SCREEN", videoSource!!)
 
         val ice = fetchIceServers()
         val rtcConfig = PeerConnection.RTCConfiguration(ice).apply {
@@ -169,7 +171,7 @@ class ScreenShareService : Service() {
             override fun onRenegotiationNeeded() {}
             override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {}
         })
-        pc!!.addTrack(videoTrack, listOf("stream0"))
+        pc!!.addTrack(videoTrack!!, listOf("stream0"))
     }
 
     private fun connectSignaling() {
