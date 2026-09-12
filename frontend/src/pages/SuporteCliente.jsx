@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
 import { LOGO } from "@/lib/logo";
-import { MonitorUp, ShieldCheck, Loader2, Smartphone, DownloadCloud } from "lucide-react";
+import { MonitorUp, ShieldCheck, Loader2, Smartphone } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -16,10 +16,20 @@ export default function SuporteCliente() {
   const [sharing, setSharing] = useState(false);
   const [circle, setCircle] = useState(null);
   const [deferred, setDeferred] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
   const isAndroid = typeof navigator !== "undefined" && /android/i.test(navigator.userAgent);
   const standalone = typeof window !== "undefined" && window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
   useEffect(() => { const h = (e) => { e.preventDefault(); setDeferred(e); }; window.addEventListener("beforeinstallprompt", h); return () => window.removeEventListener("beforeinstallprompt", h); }, []);
-  const install = async () => { if (deferred) { deferred.prompt(); await deferred.userChoice; setDeferred(null); } };
+  const install = async () => {
+    if (deferred) {
+      deferred.prompt();
+      const r = await deferred.userChoice;
+      setDeferred(null);
+      if (!r || r.outcome !== "accepted") setShowHelp(true);
+    } else {
+      setShowHelp(true);
+    }
+  };
 
   useEffect(() => () => { stop(); }, []); // cleanup on unmount
 
@@ -78,12 +88,16 @@ export default function SuporteCliente() {
               <p className="mt-2 text-sm text-slate-300">O nosso técnico vai poder ver o seu ecrã para o ajudar. Vai continuar com o controlo total e pode parar quando quiser.</p>
               <button onClick={start} data-testid="cliente-share-btn" className="mt-6 w-full rounded-lg gold-gradient py-4 text-lg font-bold text-[#0B1A30]">Partilhar o meu ecrã</button>
               {isAndroid && !standalone && (
-                <button onClick={install} data-testid="cliente-install-btn" className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-white/10 py-3 font-semibold text-white hover:bg-white/20">
-                  <Smartphone size={16} /> {deferred ? "Instalar a App no Android" : "Instalar App (menu ⋮ → Instalar aplicação)"}
+                <button onClick={install} data-testid="cliente-install-btn" className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-green-500 py-4 text-lg font-bold text-white shadow-lg hover:bg-green-600 active:scale-[0.98] transition-transform">
+                  <Smartphone size={18} /> INSTALAR APP
                 </button>
               )}
-              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-500"><ShieldCheck size={14} /> Ligação segura · a App Android instala-se e atualiza-se sozinha</p>
-              <p className="mt-1 flex items-center justify-center gap-1.5 text-[11px] text-slate-500"><DownloadCloud size={12} /> Ver ecrã: já funciona. Controlo remoto de toques exige a App nativa (Acessibilidade).</p>
+              {showHelp && (
+                <div className="mt-3 rounded-lg border border-green-400/30 bg-green-500/10 p-3 text-left text-xs text-slate-200" data-testid="install-help">
+                  Para instalar: toque no menu <b>⋮</b> (canto superior direito do Chrome) e escolha <b>“Instalar aplicação”</b> ou <b>“Adicionar ao ecrã principal”</b>. A app fica no seu ecrã inicial.
+                </div>
+              )}
+              <p className="mt-4 flex items-center justify-center gap-1.5 text-xs text-slate-500"><ShieldCheck size={14} /> Ligação segura · a App instala-se e atualiza-se sozinha</p>
             </>
           ) : (
             <>
