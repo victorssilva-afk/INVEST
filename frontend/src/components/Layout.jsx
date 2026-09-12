@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import {
   LayoutDashboard, Users, FileText, Receipt, Upload, FileSignature,
   LayoutTemplate, BarChart3, History, Settings, Calculator, Activity,
-  Bitcoin, LogOut, Menu, X, ShieldCheck, Target, Globe,
+  Bitcoin, LogOut, Menu, X, ShieldCheck, Target, Globe, LifeBuoy,
 } from "lucide-react";
 
 const NAV = [
@@ -20,6 +20,7 @@ const NAV = [
   { to: "/app/calculo", icon: Calculator, label: "Cálculo", testid: "nav-calculo" },
   { to: "/app/crypto", icon: Bitcoin, label: "Análise Crypto", testid: "nav-crypto" },
   { to: "/crypto-publico", icon: Globe, label: "Análise Pública", testid: "nav-crypto-publico" },
+  { to: "/crypto-invest/painel", icon: LifeBuoy, label: "Crypto.Invest", testid: "nav-crypto-invest" },
   { to: "/app/relatorios", icon: BarChart3, label: "Relatórios", testid: "nav-relatorios" },
   { to: "/app/historico", icon: History, label: "Histórico", testid: "nav-historico" },
   { to: "/app/monitorizacao", icon: Activity, label: "Monitorização", testid: "nav-monitorizacao" },

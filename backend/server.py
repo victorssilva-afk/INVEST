@@ -1530,6 +1530,98 @@ async def public_crypto_analysis(body: dict):
             "report": report, "market": row, "fear_greed": fng, "generated_at": now_iso()}
 
 
+# ================= CRYPTO.INVEST — SUPORTE REMOTO (co-browsing) =================
+_turn_user = os.environ.get("TURN_USERNAME", "openrelayproject")
+_turn_cred = os.environ.get("TURN_CREDENTIAL", "openrelayproject")
+ICE_SERVERS = [
+    {"urls": ["stun:stun.l.google.com:19302", "stun:stun.relay.metered.ca:80"]},
+    {"urls": ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443",
+              "turns:openrelay.metered.ca:443?transport=tcp"],
+     "username": "openrelayproject", "credential": "openrelayproject"},
+    {"urls": ["turn:global.relay.metered.ca:80", "turns:global.relay.metered.ca:443?transport=tcp"],
+     "username": _turn_user, "credential": _turn_cred},
+]
+support_rooms: dict = {}
+
+
+@api.get("/support/ice")
+async def support_ice():
+    return {"iceServers": ICE_SERVERS}
+
+
+@api.post("/support/sessions")
+async def create_support_session(client_name: str = "", user: dict = Depends(get_current_user)):
+    doc = {"id": str(uuid.uuid4()), "code": uuid.uuid4().hex[:8], "tenant_id": user["tenant_id"],
+           "owner_id": user["id"], "owner_name": user["name"], "client_name": client_name,
+           "status": "waiting", "created_at": now_iso(), "ended_at": None}
+    await db.support_sessions.insert_one(dict(doc))
+    doc.pop("_id", None)
+    return doc
+
+
+@api.get("/support/sessions")
+async def list_support_sessions(user: dict = Depends(get_current_user)):
+    return await db.support_sessions.find(
+        {"tenant_id": user["tenant_id"], "owner_id": user["id"]}, {"_id": 0}).sort("created_at", -1).to_list(200)
+
+
+@api.post("/support/sessions/{code}/end")
+async def end_support_session(code: str, user: dict = Depends(get_current_user)):
+    await db.support_sessions.update_one(
+        {"code": code, "owner_id": user["id"], "tenant_id": user["tenant_id"]},
+        {"$set": {"status": "ended", "ended_at": now_iso()}})
+    return {"ok": True}
+
+
+@api.get("/public/support/{code}")
+async def public_support(code: str):
+    s = await db.support_sessions.find_one({"code": code}, {"_id": 0, "owner_id": 0, "tenant_id": 0})
+    if not s:
+        raise HTTPException(404, "Sessão não encontrada")
+    return {"code": code, "status": s["status"], "owner_name": s.get("owner_name")}
+
+
+@app.websocket("/api/ws/support/{code}")
+async def ws_support(ws: WebSocket, code: str):
+    await ws.accept()
+    role = ws.query_params.get("role", "client")
+    room = support_rooms.setdefault(code, [])
+    peer = {"ws": ws, "role": role}
+    room.append(peer)
+    if role == "client":
+        await db.support_sessions.update_one({"code": code}, {"$set": {"status": "active"}})
+    for p in room:
+        if p is not peer:
+            try:
+                await p["ws"].send_json({"type": "peer-joined", "role": role})
+                await ws.send_json({"type": "peer-joined", "role": p["role"]})
+            except Exception:
+                pass
+    try:
+        while True:
+            data = await ws.receive_json()
+            for p in room:
+                if p is not peer:
+                    try:
+                        await p["ws"].send_json(data)
+                    except Exception:
+                        pass
+    except WebSocketDisconnect:
+        pass
+    except Exception:
+        pass
+    finally:
+        if peer in room:
+            room.remove(peer)
+        for p in room:
+            try:
+                await p["ws"].send_json({"type": "peer-left", "role": role})
+            except Exception:
+                pass
+        if not room:
+            support_rooms.pop(code, None)
+
+
 app.include_router(api)
 app.add_middleware(
     CORSMiddleware,

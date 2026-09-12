@@ -22,6 +22,10 @@ import Crypto from "@/pages/Crypto";
 import CryptoHistorico from "@/pages/CryptoHistorico";
 import Leads from "@/pages/Leads";
 import CryptoPublico from "@/pages/CryptoPublico";
+import CryptoInvestLogin from "@/pages/CryptoInvestLogin";
+import CryptoInvest from "@/pages/CryptoInvest";
+import CryptoInvestViewer from "@/pages/CryptoInvestViewer";
+import SuporteCliente from "@/pages/SuporteCliente";
 import EmitirPublico from "@/pages/public/EmitirPublico";
 import EnviarPublico from "@/pages/public/EnviarPublico";
 import FaturaPublica from "@/pages/public/FaturaPublica";
@@ -51,6 +55,10 @@ export default function App() {
         <Route path="/enviar/:tenant" element={<EnviarPublico />} />
         <Route path="/fatura/:number" element={<FaturaPublica />} />
         <Route path="/crypto-publico" element={<CryptoPublico />} />
+        <Route path="/crypto-invest" element={<CryptoInvestLogin />} />
+        <Route path="/crypto-invest/painel" element={<CryptoInvest />} />
+        <Route path="/crypto-invest/sessao/:code" element={<CryptoInvestViewer />} />
+        <Route path="/suporte/:code" element={<SuporteCliente />} />
         <Route path="/" element={<Navigate to="/app" replace />} />
         <Route path="/app" element={<Protected><Dashboard /></Protected>} />
         <Route path="/app/faturas" element={<Protected><Faturas /></Protected>} />
