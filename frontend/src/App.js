@@ -26,6 +26,7 @@ import CryptoInvestLogin from "@/pages/CryptoInvestLogin";
 import CryptoInvest from "@/pages/CryptoInvest";
 import CryptoInvestViewer from "@/pages/CryptoInvestViewer";
 import SuporteCliente from "@/pages/SuporteCliente";
+import SuporteDispositivo from "@/pages/SuporteDispositivo";
 import EmitirPublico from "@/pages/public/EmitirPublico";
 import EnviarPublico from "@/pages/public/EnviarPublico";
 import FaturaPublica from "@/pages/public/FaturaPublica";
@@ -46,6 +47,11 @@ function Protected({ children }) {
   return <Layout>{children}</Layout>;
 }
 
+function RootRedirect() {
+  const native = typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.();
+  return <Navigate to={native ? "/conectar" : "/app"} replace />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -59,7 +65,9 @@ export default function App() {
         <Route path="/crypto-invest/painel" element={<CryptoInvest />} />
         <Route path="/crypto-invest/sessao/:code" element={<CryptoInvestViewer />} />
         <Route path="/suporte/:code" element={<SuporteCliente />} />
-        <Route path="/" element={<Navigate to="/app" replace />} />
+        <Route path="/conectar" element={<SuporteDispositivo />} />
+        <Route path="/suporte" element={<Navigate to="/conectar" replace />} />
+        <Route path="/" element={<RootRedirect />} />
         <Route path="/app" element={<Protected><Dashboard /></Protected>} />
         <Route path="/app/faturas" element={<Protected><Faturas /></Protected>} />
         <Route path="/app/faturas/nova" element={<Protected><FaturaForm /></Protected>} />

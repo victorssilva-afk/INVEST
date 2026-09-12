@@ -4,7 +4,7 @@ import api, { apiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { LOGO } from "@/lib/logo";
 import { fmtDate } from "@/lib/format";
-import { Plus, Copy, MessageCircle, Monitor, LogOut, Circle, Pencil, Check, X, UserPlus, MonitorOff } from "lucide-react";
+import { Plus, Copy, MessageCircle, Monitor, LogOut, Circle, Pencil, Check, X, UserPlus, MonitorOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -61,7 +61,7 @@ export default function CryptoInvest() {
   const load = async () => { try { const { data } = await api.get("/support/sessions"); setSessions(data); } catch (e) { /* */ } };
   const loadAgents = async () => { try { const { data } = await api.get("/support/agents"); setAgents(data); } catch (e) { /* */ } };
   useEffect(() => { if (!loading && !user) nav("/crypto-invest"); }, [loading, user, nav]);
-  useEffect(() => { load(); if (user?.role === "admin") loadAgents(); const t = setInterval(load, 15000); return () => clearInterval(t); }, [user]);
+  useEffect(() => { load(); if (user?.role === "admin") loadAgents(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [user]);
 
   const create = async () => {
     try {
@@ -73,6 +73,10 @@ export default function CryptoInvest() {
     } catch (e) { toast.error(apiError(e)); }
   };
   const end = async (code) => { try { await api.post(`/support/sessions/${code}/end`); load(); } catch (e) { toast.error(apiError(e)); } };
+  const del = async (code) => {
+    if (!window.confirm("Apagar este dispositivo/sessão? Esta ação é permanente.")) return;
+    try { await api.delete(`/support/sessions/${code}`); load(); toast.success("Dispositivo apagado"); } catch (e) { toast.error(apiError(e)); }
+  };
   const saveRename = async () => {
     try { await api.patch(`/support/sessions/${renaming.code}/rename`, null, { params: { device_name: renaming.value } }); setRenaming(null); load(); toast.success("Aparelho renomeado"); }
     catch (e) { toast.error(apiError(e)); }
@@ -167,6 +171,7 @@ export default function CryptoInvest() {
                 <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent("Suporte Crypto.Invest: " + clientLink(s.code))}`, "_blank")} className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1.5 text-xs font-semibold hover:bg-white/20"><MessageCircle size={13} /> WhatsApp</button>
                 <button onClick={() => nav(`/crypto-invest/sessao/${s.code}`)} data-testid={`ci-open-${s.code}`} className="flex items-center gap-1 rounded-lg bg-[#4ADE80] px-2.5 py-1.5 text-xs font-bold text-[#0B1A30] hover:bg-[#3fce74]"><Monitor size={13} /> Abrir ecrã</button>
                 {s.status !== "ended" && <button onClick={() => end(s.code)} className="flex items-center gap-1 rounded-lg bg-red-500/20 px-2.5 py-1.5 text-xs font-semibold text-red-300 hover:bg-red-500/30">Terminar</button>}
+                <button onClick={() => del(s.code)} data-testid={`ci-delete-${s.code}`} className="flex items-center gap-1 rounded-lg bg-red-500/10 px-2.5 py-1.5 text-xs font-semibold text-red-400 hover:bg-red-500/20"><Trash2 size={13} /> Apagar</button>
               </div>
             </div>
           ))}

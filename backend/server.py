@@ -1544,6 +1544,33 @@ ICE_SERVERS = [
 support_rooms: dict = {}
 
 
+class ConnectIn(BaseModel):
+    device_id: str
+    device_name: str = ""
+
+
+@api.post("/public/support/connect")
+async def public_support_connect(body: ConnectIn):
+    """Cliente auto-regista o dispositivo — sem login. Reconhece o mesmo aparelho pelo device_id."""
+    tenant = DEFAULT_TENANT
+    name = (body.device_name or "Aparelho").strip()[:60] or "Aparelho"
+    existing = await db.support_sessions.find_one(
+        {"device_id": body.device_id, "tenant_id": tenant}, {"_id": 0})
+    if existing:
+        await db.support_sessions.update_one(
+            {"code": existing["code"]},
+            {"$set": {"status": "waiting", "last_seen": now_iso(), "ended_at": None}})
+        return {"code": existing["code"]}
+    code = uuid.uuid4().hex[:8]
+    doc = {"id": str(uuid.uuid4()), "code": code, "tenant_id": tenant,
+           "owner_id": None, "owner_name": None, "assigned_to": None, "assigned_name": None,
+           "device_id": body.device_id, "client_name": name, "device_name": name,
+           "source": "device", "status": "waiting", "created_at": now_iso(),
+           "last_seen": now_iso(), "ended_at": None}
+    await db.support_sessions.insert_one(dict(doc))
+    return {"code": code}
+
+
 @api.get("/support/ice")
 async def support_ice():
     return {"iceServers": ICE_SERVERS}
@@ -1618,6 +1645,13 @@ async def assign_support_session(code: str, assigned_to: str = "", user: dict = 
     await db.support_sessions.update_one(
         {"code": code, "tenant_id": user["tenant_id"]},
         {"$set": {"assigned_to": target["id"], "assigned_name": target["name"]}})
+    return {"ok": True}
+
+
+@api.delete("/support/sessions/{code}")
+async def delete_support_session(code: str, user: dict = Depends(get_current_user)):
+    await _session_for_user(code, user)
+    await db.support_sessions.delete_one({"code": code, "tenant_id": user["tenant_id"]})
     return {"ok": True}
 
 

@@ -49,6 +49,15 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - electron/package.json: nsis oneClick + artifactName fixo Crypto.Invest-Setup.exe.
 - IMPORTANTE: links só funcionam DEPOIS de correr os workflows (criam a Release). Browser não instala silenciosamente: descarrega e o utilizador confirma (Android: permitir origem desconhecida; Windows: executar .exe).
 
+## Fluxo cliente self-service (2026-09-12)
+- Nova página `/conectar` (SuporteDispositivo.jsx): SEM login. Um botão CONECTAR → auto-regista o dispositivo e partilha ecrã.
+- Reconhecimento por device_id (localStorage) → mesmo aparelho reutiliza a mesma sessão/code (POST /public/support/connect, sem auth, tenant=invest).
+- Sessão do dispositivo aparece automaticamente no CRM do técnico (admin vê todas; polling 5s). source="device".
+- Apagar dispositivo/sessão no CRM: DELETE /support/sessions/{code} + botão "Apagar" no cartão.
+- APK/app nativo abre direto em /conectar (RootRedirect deteta window.Capacitor.isNativePlatform).
+- Fluxo antigo por link /suporte/{code} mantido para casos iniciados pelo técnico.
+- Testado por curl (connect idempotente por device, listagem no CRM, delete) + screenshot da página /conectar.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").
