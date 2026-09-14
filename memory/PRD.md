@@ -73,6 +73,14 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 
 - VALIDAÇÃO (2026-09-12): instalado JDK17+SDK34+gradle8.9 no container; build parou no aapt2 APENAS por ser arm64 (aapt2 é x86_64) — não é bug de código; GitHub runner x86_64 corre aapt2 OK. Compilei ScreenShareService.kt + RemoteControlService.kt com kotlinc 1.9.24 contra libs reais (stream-webrtc 1.3.10, okhttp 4.12, androidx.core, android.jar): exit=0, 0 erros. SDK removido de /app; adicionado android-native/.gitignore.
 
+## Melhorias suporte (2026-09-14)
+- Android cliques: RemoteControlService passou a usar getRealMetrics (ecrã completo incl. barras) em vez de resources.displayMetrics → corrige offset (toques/botões inferiores caíam acima). Mapeamento agora coincide com a captura (ScreenCapturerAndroid usa getRealMetrics).
+- Android teclado: typeText usa findFocus(FOCUS_INPUT) + ACTION_SET_TEXT + ACTION_SET_SELECTION (cursor no fim). Mais fiável.
+- Viewer técnico: botão "Ecrã inteiro" (video.requestFullscreen).
+- Link permanente por técnico: user.support_token + GET /support/my-link; /public/support/connect aceita tech_token → sessão atribuída a esse técnico e reutilizada por device_id. Painel mostra cartão "O meu link permanente" com Copiar/WhatsApp. Link = /conectar?t=TOKEN.
+- Electron (Windows): main.js agora abre /conectar?autostart=1 (era /crypto-invest = CRM). Auto-partilha de ecrã (setDisplayMediaRequestHandler) + auto-conectar. NOTA: controlo de rato/teclado no Windows NÃO implementado (Electron não injeta input do SO sem módulo nativo tipo robotjs/nut.js) — só partilha de ecrã + auto-conectar. Android tem controlo completo via Acessibilidade.
+- Validado: backend curl (my-link, connect com tech_token atribui e reutiliza). Alterações Android usam APIs padrão (baixo risco); build completo continua a depender do GitHub x86_64.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").

@@ -1547,28 +1547,49 @@ support_rooms: dict = {}
 class ConnectIn(BaseModel):
     device_id: str
     device_name: str = ""
+    tech_token: str = ""
 
 
 @api.post("/public/support/connect")
 async def public_support_connect(body: ConnectIn):
-    """Cliente auto-regista o dispositivo — sem login. Reconhece o mesmo aparelho pelo device_id."""
+    """Cliente auto-regista o dispositivo — sem login. Reconhece o mesmo aparelho pelo device_id.
+    Se tech_token for dado (link permanente do técnico), a sessão é atribuída a esse técnico."""
     tenant = DEFAULT_TENANT
+    owner_id = None; owner_name = None; assigned_to = None; assigned_name = None
+    if body.tech_token:
+        tech = await db.users.find_one({"support_token": body.tech_token}, {"_id": 0})
+        if tech:
+            tenant = tech["tenant_id"]
+            owner_id = tech["id"]; owner_name = tech["name"]
+            assigned_to = tech["id"]; assigned_name = tech["name"]
     name = (body.device_name or "Aparelho").strip()[:60] or "Aparelho"
     existing = await db.support_sessions.find_one(
         {"device_id": body.device_id, "tenant_id": tenant}, {"_id": 0})
     if existing:
-        await db.support_sessions.update_one(
-            {"code": existing["code"]},
-            {"$set": {"status": "waiting", "last_seen": now_iso(), "ended_at": None}})
+        upd = {"status": "waiting", "last_seen": now_iso(), "ended_at": None}
+        if body.tech_token and assigned_to:
+            upd.update({"owner_id": owner_id, "owner_name": owner_name,
+                        "assigned_to": assigned_to, "assigned_name": assigned_name})
+        await db.support_sessions.update_one({"code": existing["code"]}, {"$set": upd})
         return {"code": existing["code"]}
     code = uuid.uuid4().hex[:8]
     doc = {"id": str(uuid.uuid4()), "code": code, "tenant_id": tenant,
-           "owner_id": None, "owner_name": None, "assigned_to": None, "assigned_name": None,
+           "owner_id": owner_id, "owner_name": owner_name, "assigned_to": assigned_to, "assigned_name": assigned_name,
            "device_id": body.device_id, "client_name": name, "device_name": name,
            "source": "device", "status": "waiting", "created_at": now_iso(),
            "last_seen": now_iso(), "ended_at": None}
     await db.support_sessions.insert_one(dict(doc))
     return {"code": code}
+
+
+@api.get("/support/my-link")
+async def my_support_link(user: dict = Depends(get_current_user)):
+    u = await db.users.find_one({"id": user["id"]}, {"_id": 0})
+    token = u.get("support_token")
+    if not token:
+        token = uuid.uuid4().hex[:12]
+        await db.users.update_one({"id": user["id"]}, {"$set": {"support_token": token}})
+    return {"token": token}
 
 
 @api.get("/support/ice")

@@ -2,9 +2,12 @@ package pt.invest.cryptoinvest
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.content.Context
 import android.graphics.Path
+import android.os.Build
 import android.os.Bundle
 import android.util.DisplayMetrics
+import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 
@@ -24,7 +27,10 @@ class RemoteControlService : AccessibilityService() {
     override fun onDestroy() { if (instance === this) instance = null; super.onDestroy() }
 
     private fun screenSize(): Pair<Int, Int> {
-        val m: DisplayMetrics = resources.displayMetrics
+        val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val m = DisplayMetrics()
+        @Suppress("DEPRECATION")
+        wm.defaultDisplay.getRealMetrics(m)
         return Pair(m.widthPixels, m.heightPixels)
     }
 
@@ -54,15 +60,21 @@ class RemoteControlService : AccessibilityService() {
 
     fun typeText(text: String) {
         if (text.isEmpty()) return
-        val root = rootInActiveWindow ?: return
-        val focused = findFocusedEditable(root) ?: root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        if (focused != null && focused.isEditable) {
-            val current = focused.text?.toString() ?: ""
-            val args = Bundle().apply {
-                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, current + text)
-            }
-            focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        val node = findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+            ?: rootInActiveWindow?.let { findFocusedEditable(it) }
+            ?: return
+        if (!node.isEditable) return
+        val current = node.text?.toString() ?: ""
+        val newText = current + text
+        val args = Bundle().apply {
+            putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
         }
+        node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        val sel = Bundle().apply {
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, newText.length)
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, newText.length)
+        }
+        node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, sel)
     }
 
     private fun findFocusedEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {

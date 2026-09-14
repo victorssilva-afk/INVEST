@@ -57,11 +57,13 @@ export default function CryptoInvest() {
   const [assignTo, setAssignTo] = useState("");
   const [renaming, setRenaming] = useState(null); // { code, value }
   const [newAgent, setNewAgent] = useState({ name: "", email: "", password: "" });
+  const [myToken, setMyToken] = useState("");
+  const myLink = myToken ? `${window.location.origin}/conectar?t=${myToken}` : "";
 
   const load = async () => { try { const { data } = await api.get("/support/sessions"); setSessions(data); } catch (e) { /* */ } };
   const loadAgents = async () => { try { const { data } = await api.get("/support/agents"); setAgents(data); } catch (e) { /* */ } };
   useEffect(() => { if (!loading && !user) nav("/crypto-invest"); }, [loading, user, nav]);
-  useEffect(() => { load(); if (user?.role === "admin") loadAgents(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [user]);
+  useEffect(() => { load(); if (user?.role === "admin") loadAgents(); (async () => { try { const { data } = await api.get("/support/my-link"); setMyToken(data.token); } catch (e) { /* */ } })(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [user]);
 
   const create = async () => {
     try {
@@ -105,6 +107,16 @@ export default function CryptoInvest() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-8">
+        <div className="mb-6 rounded-2xl border border-[#4ADE80]/30 bg-[#4ADE80]/5 p-5" data-testid="ci-mylink-card">
+          <div className="flex items-center gap-2 font-head font-semibold"><Copy size={18} className="text-[#4ADE80]" /> O meu link permanente</div>
+          <p className="mt-1 text-sm text-slate-400">Envie sempre este link ao cliente. Os aparelhos são reconhecidos automaticamente e as sessões ficam atribuídas a si — sem criar sessão para cada pessoa.</p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <input readOnly value={myLink} data-testid="ci-mylink-input" className="min-w-[260px] flex-1 rounded-lg border border-white/20 bg-[#171A1F] px-3 py-2.5 font-mono text-sm outline-none" />
+            <button onClick={async () => { try { await navigator.clipboard.writeText(myLink); } catch (e) { /* */ } toast.success("Link copiado"); }} data-testid="ci-mylink-copy" className="flex items-center gap-2 rounded-lg bg-[#4ADE80] px-5 py-2.5 font-bold text-[#0B1A30] hover:bg-[#3fce74]"><Copy size={16} /> Copiar</button>
+            <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent("Suporte Crypto.Invest: " + myLink)}`, "_blank")} className="flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2.5 text-sm font-semibold hover:bg-white/20"><MessageCircle size={15} /> WhatsApp</button>
+          </div>
+        </div>
+
         {isAdmin && (
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/[0.04] p-5" data-testid="ci-agents-card">
             <div className="flex items-center gap-2 font-head font-semibold"><UserPlus size={18} className="text-[#4ADE80]" /> Gerir agentes</div>

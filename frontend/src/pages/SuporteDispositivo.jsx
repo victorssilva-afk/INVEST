@@ -51,6 +51,10 @@ export default function SuporteDispositivo() {
   const [showHelp, setShowHelp] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
   const canShare = typeof navigator !== "undefined" && navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === "function";
+  const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
+  const techToken = params.get("t") || "";
+  const autostart = params.get("autostart") === "1";
+  const startedRef = useRef(false);
   const isAndroid = /android/i.test(navigator.userAgent);
   const isWindows = /windows/i.test(navigator.userAgent);
   const isNative = typeof window !== "undefined" && window.Capacitor?.isNativePlatform?.();
@@ -58,6 +62,10 @@ export default function SuporteDispositivo() {
 
   useEffect(() => { const h = (e) => { e.preventDefault(); setDeferred(e); }; window.addEventListener("beforeinstallprompt", h); return () => window.removeEventListener("beforeinstallprompt", h); }, []);
   useEffect(() => () => { stop(); }, []); // cleanup
+  useEffect(() => {
+    if (autostart && canShare && !startedRef.current) { startedRef.current = true; connect(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const install = async () => {
     if (APK_APP_URL) { triggerDownload(APK_APP_URL); setShowHelp(true); return; }
@@ -92,7 +100,7 @@ export default function SuporteDispositivo() {
     setConnecting(true); setStatus("A preparar ligação…");
     let code;
     try {
-      const { data } = await axios.post(`${API}/public/support/connect`, { device_id: getDeviceId(), device_name: detectDeviceName() });
+      const { data } = await axios.post(`${API}/public/support/connect`, { device_id: getDeviceId(), device_name: detectDeviceName(), tech_token: techToken });
       code = data.code; codeRef.current = code;
     } catch (e) { setConnecting(false); setStatus("Não foi possível ligar. Tente novamente."); return; }
 

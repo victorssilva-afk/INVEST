@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
-import { ArrowLeft, MousePointerClick, Circle, RefreshCw } from "lucide-react";
+import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -77,6 +77,7 @@ export default function CryptoInvestViewer() {
         <button onClick={() => nav("/crypto-invest/painel")} className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white"><ArrowLeft size={16} /> Painel</button>
         <div className="font-head font-bold">Crypto<span className="text-[#4ADE80]">.Invest</span> · Sessão {code}</div>
         <div className="flex items-center gap-3">
+          <button onClick={() => { try { videoRef.current?.requestFullscreen?.(); } catch (e) { /* */ } }} data-testid="ci-fullscreen" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20"><Maximize size={13} /> Ecrã inteiro</button>
           <button onClick={connect} data-testid="ci-reconnect" className="flex items-center gap-1.5 rounded-lg bg-[#4ADE80] px-3 py-1.5 text-xs font-bold text-[#0B1A30] hover:bg-[#3fce74]"><RefreshCw size={13} /> Reconectar</button>
           <span className="flex items-center gap-1.5 text-xs text-slate-400"><Circle size={10} className="text-red-500" /> {status}</span>
         </div>

@@ -2,7 +2,7 @@ const { app, BrowserWindow, desktopCapturer, session } = require("electron");
 
 // Crypto.Invest — janela desktop (Windows/Mac/Linux) que carrega o site.
 // A partilha de ecrã (getDisplayMedia) é concedida automaticamente ao 1º ecrã.
-const APP_URL = process.env.CRYPTOINVEST_URL || "https://invest-analysis-14.preview.emergentagent.com/crypto-invest";
+const APP_URL = process.env.CRYPTOINVEST_URL || "https://invest-analysis-14.preview.emergentagent.com/conectar?autostart=1";
 
 function createWindow() {
   const win = new BrowserWindow({
