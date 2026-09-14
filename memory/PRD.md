@@ -83,6 +83,14 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 
 - LOGO CONEXÃO (2026-09-14): nova logo aplicada aos ícones da app Android (mipmaps mdpi→xxxhdpi ic_launcher/ic_launcher_round) e Windows (electron/build/icon.ico + icon.png; package.json win.icon/nsis installerIcon/mac/linux icon). Fonte: /app/frontend/public/conexao-src.png. Aplica-se no próximo build GitHub.
 
+## Controlo remoto Windows (2026-09-14)
+- Electron app agora suporta controlo remoto do SO SEM módulo nativo: main.js executa PowerShell (user32.dll SetCursorPos+mouse_event p/ tap/swipe; System.Windows.Forms.SendKeys p/ texto), acionado por IPC.
+- preload.js expõe window.CI_NATIVE.control(cmd) via contextBridge (contextIsolation).
+- SuporteDispositivo.jsx: ao receber gesture/text por WS, se window.CI_NATIVE.available (Electron), converte coords normalizadas → pixels (via track getSettings width/height) e reencaminha ao main → cliques/arrasto/teclado reais no Windows.
+- electron/package.json: files inclui preload.js; ícone CONEXÃO (build/icon.ico).
+- Caveat DPI: em ecrãs com escala !=100% pode haver ligeiro desvio (SetCursorPos usa pixels físicos). A 100% é preciso.
+- NÃO testável no container (precisa de Windows + .exe do GitHub). Frontend forwarding compila OK.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").
