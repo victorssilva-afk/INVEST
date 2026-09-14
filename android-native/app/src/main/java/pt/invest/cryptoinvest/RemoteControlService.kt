@@ -87,6 +87,17 @@ class RemoteControlService : AccessibilityService() {
         return null
     }
 
+    fun globalAction(name: String) {
+        val a = when (name) {
+            "back" -> GLOBAL_ACTION_BACK
+            "home" -> GLOBAL_ACTION_HOME
+            "recents" -> GLOBAL_ACTION_RECENTS
+            "notifications" -> GLOBAL_ACTION_NOTIFICATIONS
+            else -> return
+        }
+        try { performGlobalAction(a) } catch (e: Exception) {}
+    }
+
     companion object {
         @Volatile
         var instance: RemoteControlService? = null

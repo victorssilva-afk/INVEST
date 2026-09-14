@@ -211,6 +211,7 @@ class ScreenShareService : Service() {
                         rc?.doTap(m.getDouble("x"), m.getDouble("y"))
                 }
                 "text" -> RemoteControlService.instance?.typeText(m.optString("value"))
+                "nav" -> RemoteControlService.instance?.globalAction(m.optString("action"))
             }
         } catch (e: Exception) { Log.w(TAG, "msg error", e) }
     }

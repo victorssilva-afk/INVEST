@@ -100,6 +100,9 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Ícone "estranho" (pequeno em círculo branco): criado ícone adaptativo — mipmap-anydpi-v26/ic_launcher.xml + ic_launcher_round.xml (foreground @mipmap/ic_launcher_fg + background @color/ic_launcher_background=#040718). Foregrounds ic_launcher_fg.png gerados por densidade (logo ~74% centrada em canvas transparente). Fonte: logo gerada por IA (conexao-src.png).
 - Viewer confirmado correto (autoplay/muted/playsInline/ontrack). Aplica-se no próximo build GitHub.
 
+## Navegação sistema Android (2026-09-14)
+- Botões Voltar/Início/Recentes do sistema não respondiam a dispatchGesture (toque não prime botões do sistema). Solução: RemoteControlService.globalAction() usa performGlobalAction (GLOBAL_ACTION_BACK/HOME/RECENTS/NOTIFICATIONS). ScreenShareService trata type "nav". Viewer tem barra "Navegação Android" com 4 botões que enviam {type:"nav",action}. Aplica-se no próximo build GitHub.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").

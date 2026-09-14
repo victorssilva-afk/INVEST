@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
-import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize } from "lucide-react";
+import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize, ChevronLeft, CircleDot, Square, Bell } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -84,6 +84,13 @@ export default function CryptoInvestViewer() {
       </header>
       <main className="mx-auto max-w-6xl p-4">
         <div className="mb-2 flex items-center gap-2 text-xs text-slate-400"><MousePointerClick size={14} /> Clique = toque · arraste = deslizar (swipe) no ecrã do cliente (requer a App Android com Acessibilidade ativa).</div>
+        <div className="mb-3 flex flex-wrap items-center gap-2" data-testid="ci-nav-bar">
+          <span className="text-xs text-slate-400">Navegação Android:</span>
+          <button onClick={() => send({ type: "nav", action: "back" })} data-testid="ci-nav-back" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><ChevronLeft size={14} /> Voltar</button>
+          <button onClick={() => send({ type: "nav", action: "home" })} data-testid="ci-nav-home" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><CircleDot size={14} /> Início</button>
+          <button onClick={() => send({ type: "nav", action: "recents" })} data-testid="ci-nav-recents" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><Square size={13} /> Recentes</button>
+          <button onClick={() => send({ type: "nav", action: "notifications" })} data-testid="ci-nav-notif" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><Bell size={13} /> Notif.</button>
+        </div>
         <div className="mb-3 flex gap-2">
           <input value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && txt) { send({ type: "text", value: txt }); setTxt(""); } }} placeholder="Escrever no dispositivo do cliente (teclado remoto)…" data-testid="ci-text-input" className="flex-1 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500" />
           <button onClick={() => { if (txt) { send({ type: "text", value: txt }); setTxt(""); } }} data-testid="ci-text-send" className="rounded-lg bg-[#4ADE80] px-4 py-2 text-sm font-bold text-[#0B1A30] hover:bg-[#3fce74]">Enviar texto</button>
