@@ -13,20 +13,26 @@ function ps(script) {
   } catch (e) { /* ignore */ }
 }
 
-const MOUSE = "Add-Type -Name U -Namespace W -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool SetCursorPos(int X,int Y); [DllImport(\"user32.dll\")] public static extern void mouse_event(uint f,uint dx,uint dy,uint d,int e);';";
+const MOUSE = "Add-Type -Name U -Namespace W -MemberDefinition '[DllImport(\"user32.dll\")] public static extern void mouse_event(uint f,uint dx,uint dy,uint d,int e);';";
 
-function tap(x, y) {
-  ps(`${MOUSE} [W.U]::SetCursorPos(${x | 0},${y | 0}); [W.U]::mouse_event(2,0,0,0,0); Start-Sleep -Milliseconds 40; [W.U]::mouse_event(4,0,0,0,0)`);
+function clamp01(v) { return Math.min(1, Math.max(0, v)); }
+function absMove(nx, ny) {
+  // Coordenadas absolutas normalizadas (0..65535) — imunes a DPI/escala do ecra.
+  return `[W.U]::mouse_event(0x8001,${Math.round(clamp01(nx) * 65535)},${Math.round(clamp01(ny) * 65535)},0,0);`;
 }
 
-function swipe(x, y, x2, y2, dur) {
-  const steps = 14;
+function tap(nx, ny) {
+  ps(`${MOUSE} ${absMove(nx, ny)} Start-Sleep -Milliseconds 25; [W.U]::mouse_event(2,0,0,0,0); Start-Sleep -Milliseconds 45; [W.U]::mouse_event(4,0,0,0,0)`);
+}
+
+function swipe(nx, ny, nx2, ny2, dur) {
+  const steps = 16;
   const per = Math.max(5, Math.round((dur || 350) / steps));
-  let s = `${MOUSE} [W.U]::SetCursorPos(${x | 0},${y | 0}); [W.U]::mouse_event(2,0,0,0,0);`;
+  let s = `${MOUSE} ${absMove(nx, ny)} [W.U]::mouse_event(2,0,0,0,0);`;
   for (let i = 1; i <= steps; i++) {
-    const ix = Math.round(x + (x2 - x) * (i / steps));
-    const iy = Math.round(y + (y2 - y) * (i / steps));
-    s += ` Start-Sleep -Milliseconds ${per}; [W.U]::SetCursorPos(${ix},${iy});`;
+    const ix = nx + (nx2 - nx) * (i / steps);
+    const iy = ny + (ny2 - ny) * (i / steps);
+    s += ` Start-Sleep -Milliseconds ${per}; ${absMove(ix, iy)}`;
   }
   s += " [W.U]::mouse_event(4,0,0,0,0)";
   ps(s);

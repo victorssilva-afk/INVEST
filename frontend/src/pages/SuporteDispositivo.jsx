@@ -134,10 +134,8 @@ export default function SuporteDispositivo() {
         else if (m.type === "ice" && m.candidate) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
         else if (m.type === "circle") setCircle({ x: m.x, y: m.y, k: Date.now() });
         else if (m.type === "gesture" && window.CI_NATIVE?.available) {
-          const st = streamRef.current?.getVideoTracks?.()[0]?.getSettings?.() || {};
-          const W = st.width || window.screen.width; const H = st.height || window.screen.height;
-          if (m.action === "swipe") window.CI_NATIVE.control({ action: "swipe", x: Math.round(m.x * W), y: Math.round(m.y * H), x2: Math.round(m.x2 * W), y2: Math.round(m.y2 * H), duration: m.duration });
-          else window.CI_NATIVE.control({ action: "tap", x: Math.round(m.x * W), y: Math.round(m.y * H) });
+          if (m.action === "swipe") window.CI_NATIVE.control({ action: "swipe", x: m.x, y: m.y, x2: m.x2, y2: m.y2, duration: m.duration });
+          else window.CI_NATIVE.control({ action: "tap", x: m.x, y: m.y });
         }
         else if (m.type === "text" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "text", value: m.value });
       };

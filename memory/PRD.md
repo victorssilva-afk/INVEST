@@ -91,6 +91,10 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Caveat DPI: em ecrãs com escala !=100% pode haver ligeiro desvio (SetCursorPos usa pixels físicos). A 100% é preciso.
 - NÃO testável no container (precisa de Windows + .exe do GitHub). Frontend forwarding compila OK.
 
+## Correção clique Windows + nova logo gerada (2026-09-14)
+- Clique desalinhado corrigido: Electron passou a usar mouse_event ABSOLUTE (0x8001) com coords normalizadas 0..65535 (imune a DPI/escala) em vez de SetCursorPos em pixels. Renderer envia coords normalizadas 0..1 (sem conversão por track). Sintaxe Node validada (node --check OK).
+- Logo: nova logo criada com image_generation_tool (Bitcoin+rede/circuito verde, estilo ícone app) substituiu as fotos. Aplicada a Android mipmaps + Electron icon.ico/png. Fonte: /app/frontend/public/conexao-src.png.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").
