@@ -95,6 +95,11 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Clique desalinhado corrigido: Electron passou a usar mouse_event ABSOLUTE (0x8001) com coords normalizadas 0..65535 (imune a DPI/escala) em vez de SetCursorPos em pixels. Renderer envia coords normalizadas 0..1 (sem conversão por track). Sintaxe Node validada (node --check OK).
 - Logo: nova logo criada com image_generation_tool (Bitcoin+rede/circuito verde, estilo ícone app) substituiu as fotos. Aplicada a Android mipmaps + Electron icon.ico/png. Fonte: /app/frontend/public/conexao-src.png.
 
+## Correções Android vídeo + ícone (2026-09-14)
+- Ecrã preto/lento p/ técnico: ScreenShareService reduz captura (lado maior ≤1280, dimensões pares) e fps 20→15; DefaultVideoEncoderFactory highProfile true→false (H264 baseline, mais compatível com browser). Coords de controlo continuam normalizadas (independentes da resolução).
+- Ícone "estranho" (pequeno em círculo branco): criado ícone adaptativo — mipmap-anydpi-v26/ic_launcher.xml + ic_launcher_round.xml (foreground @mipmap/ic_launcher_fg + background @color/ic_launcher_background=#040718). Foregrounds ic_launcher_fg.png gerados por densidade (logo ~74% centrada em canvas transparente). Fonte: logo gerada por IA (conexao-src.png).
+- Viewer confirmado correto (autoplay/muted/playsInline/ontrack). Aplica-se no próximo build GitHub.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").

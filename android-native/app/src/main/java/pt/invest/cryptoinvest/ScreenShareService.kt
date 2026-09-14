@@ -129,7 +129,7 @@ class ScreenShareService : Service() {
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(applicationContext).createInitializationOptions()
         )
-        val encoder = DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true)
+        val encoder = DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, false)
         val decoder = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
         factory = PeerConnectionFactory.builder()
             .setVideoEncoderFactory(encoder)
@@ -146,10 +146,14 @@ class ScreenShareService : Service() {
 
         val metrics = DisplayMetrics()
         (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
-        val w = if (metrics.widthPixels > 0) metrics.widthPixels else 720
-        val h = if (metrics.heightPixels > 0) metrics.heightPixels else 1280
-        capturer!!.startCapture(w, h, 20)
+        val fullW = if (metrics.widthPixels > 0) metrics.widthPixels else 720
+        val fullH = if (metrics.heightPixels > 0) metrics.heightPixels else 1280
+        // Reduz a resolucao (lado maior <= 1280) e fps para evitar ecra preto/lentidao com encoder software.
+        val scale = minOf(1.0, 1280.0 / maxOf(fullW, fullH))
+        val cw = (Math.round(fullW * scale).toInt()) / 2 * 2
+        val ch = (Math.round(fullH * scale).toInt()) / 2 * 2
         videoTrack = factory!!.createVideoTrack("SCREEN", videoSource!!)
+        capturer!!.startCapture(cw, ch, 15)
 
         val ice = fetchIceServers()
         val rtcConfig = PeerConnection.RTCConfiguration(ice).apply {
