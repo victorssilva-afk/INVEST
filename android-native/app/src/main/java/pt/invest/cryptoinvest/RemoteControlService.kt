@@ -58,14 +58,12 @@ class RemoteControlService : AccessibilityService() {
         dispatchGesture(gesture, null, null)
     }
 
-    fun typeText(text: String) {
-        if (text.isEmpty()) return
-        val node = findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-            ?: rootInActiveWindow?.let { findFocusedEditable(it) }
-            ?: return
-        if (!node.isEditable) return
-        val current = node.text?.toString() ?: ""
-        val newText = current + text
+    private fun focusedEditable(): AccessibilityNodeInfo? {
+        val n = findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: rootInActiveWindow?.let { findFocusedEditable(it) }
+        return if (n != null && n.isEditable) n else null
+    }
+
+    private fun setNodeText(node: AccessibilityNodeInfo, newText: String) {
         val args = Bundle().apply {
             putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, newText)
         }
@@ -75,6 +73,28 @@ class RemoteControlService : AccessibilityService() {
             putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, newText.length)
         }
         node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, sel)
+    }
+
+    fun typeText(text: String) {
+        if (text.isEmpty()) return
+        val node = focusedEditable() ?: return
+        setNodeText(node, (node.text?.toString() ?: "") + text)
+    }
+
+    fun keyAction(key: String) {
+        when (key) {
+            "Backspace" -> {
+                val node = focusedEditable() ?: return
+                val cur = node.text?.toString() ?: ""
+                if (cur.isNotEmpty()) setNodeText(node, cur.substring(0, cur.length - 1))
+            }
+            "Enter" -> {
+                val node = findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && node != null) {
+                    try { node.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id) } catch (e: Exception) {}
+                }
+            }
+        }
     }
 
     private fun findFocusedEditable(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {

@@ -138,6 +138,7 @@ export default function SuporteDispositivo() {
           else window.CI_NATIVE.control({ action: "tap", x: m.x, y: m.y });
         }
         else if (m.type === "text" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "text", value: m.value });
+        else if (m.type === "key" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "key", key: m.key });
       };
       ws.onclose = () => { if (streamRef.current) { setStatus("Ligação perdida. A reconectar…"); setTimeout(connectWs, 2000); } };
     };

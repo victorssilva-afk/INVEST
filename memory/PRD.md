@@ -103,6 +103,13 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 ## Navegação sistema Android (2026-09-14)
 - Botões Voltar/Início/Recentes do sistema não respondiam a dispatchGesture (toque não prime botões do sistema). Solução: RemoteControlService.globalAction() usa performGlobalAction (GLOBAL_ACTION_BACK/HOME/RECENTS/NOTIFICATIONS). ScreenShareService trata type "nav". Viewer tem barra "Navegação Android" com 4 botões que enviam {type:"nav",action}. Aplica-se no próximo build GitHub.
 
+## Correção definitiva cliques + teclado ao vivo (2026-09-14)
+- CAUSA-RAIZ do clique deslocado (Android E Windows): o viewer usa <video object-contain> (barras pretas) e a normalização NÃO descontava o letterbox → todos os toques saíam deslocados. Corrigido norm() para calcular offset/escala do conteúdo real do vídeo (videoWidth/Height vs rect). Resolve ambos os SO de uma vez.
+- Teclado ao vivo: botão "Teclado ao vivo" (toggle) no viewer captura keydown da janela → envia text (chars) e key (Enter/Backspace/Tab/setas/Delete/Esc/Home/End). Ignora quando o foco está num input/textarea (mantém caixa manual).
+- Android: RemoteControlService.keyAction (Backspace apaga último char via ACTION_SET_TEXT; Enter via ACTION_IME_ENTER R+). typeText refatorado (focusedEditable+setNodeText).
+- Windows/Electron: main.js sendKey (SendKeys tokens {ENTER}{BS}{TAB}{UP}...); renderer reencaminha {type:"key"} a CI_NATIVE.
+- Aplica-se no próximo build GitHub (Android/Windows). Frontend validado (200), node --check main.js OK.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").

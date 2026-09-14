@@ -43,12 +43,20 @@ function typeText(v) {
   ps(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait("${esc}")`);
 }
 
+function sendKey(key) {
+  const map = { Enter: "{ENTER}", Backspace: "{BS}", Tab: "{TAB}", Delete: "{DEL}", Escape: "{ESC}", ArrowUp: "{UP}", ArrowDown: "{DOWN}", ArrowLeft: "{LEFT}", ArrowRight: "{RIGHT}", Home: "{HOME}", End: "{END}" };
+  const tok = map[key];
+  if (!tok) return;
+  ps(`Add-Type -AssemblyName System.Windows.Forms; [System.Windows.Forms.SendKeys]::SendWait('${tok}')`);
+}
+
 ipcMain.on("ci-control", (_e, c) => {
   if (process.platform !== "win32" || !c) return;
   try {
     if (c.action === "tap") tap(c.x, c.y);
     else if (c.action === "swipe") swipe(c.x, c.y, c.x2, c.y2, c.duration);
     else if (c.action === "text") typeText(c.value);
+    else if (c.action === "key") sendKey(c.key);
   } catch (e) { /* ignore */ }
 });
 
