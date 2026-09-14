@@ -81,6 +81,8 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Electron (Windows): main.js agora abre /conectar?autostart=1 (era /crypto-invest = CRM). Auto-partilha de ecrã (setDisplayMediaRequestHandler) + auto-conectar. NOTA: controlo de rato/teclado no Windows NÃO implementado (Electron não injeta input do SO sem módulo nativo tipo robotjs/nut.js) — só partilha de ecrã + auto-conectar. Android tem controlo completo via Acessibilidade.
 - Validado: backend curl (my-link, connect com tech_token atribui e reutiliza). Alterações Android usam APIs padrão (baixo risco); build completo continua a depender do GitHub x86_64.
 
+- LOGO CONEXÃO (2026-09-14): nova logo aplicada aos ícones da app Android (mipmaps mdpi→xxxhdpi ic_launcher/ic_launcher_round) e Windows (electron/build/icon.ico + icon.png; package.json win.icon/nsis installerIcon/mac/linux icon). Fonte: /app/frontend/public/conexao-src.png. Aplica-se no próximo build GitHub.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").
