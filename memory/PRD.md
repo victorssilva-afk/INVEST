@@ -116,6 +116,13 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Bloco esquerdo mudou de "FATURAR A / nome cliente" para "REMETENTE / NOME DO REMETENTE" (literal, conforme pedido). Bloco direito "PAGAMENTO A" mantém cliente+banco+IBAN+SWIFT.
 - Nota: "FATURAR A" só existia no PDF (não nas páginas web); logo o documento emitido está corrigido.
 
+## Correções fatura PDF v2 (2026-09-14)
+- Logo: re-embutida a logo SERVIÇOS correta (anexo 1254x1254 → invoiceLogo.js 520px). A anterior estava errada.
+- REMETENTE: PDF agora mostra inv.sender.name (valor digitado no emissor) em vez do texto fixo "NOME DO REMETENTE". Backend confirmado a devolver sender (build_invoice_doc).
+- "Atlas Financeiro & Jurídico" → "Financeiro & Jurídico" (default em EmitirPublico, 2 sítios).
+- Verificado E2E via curl (public/invoice/create): sender.name, descrição, destinatário e IBAN chegam 100% ao doc devolvido → PDF.
+- FaturaPublica (/fatura/{n}) é só um resumo de pagamento (mantida); o documento formal é o PDF.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").

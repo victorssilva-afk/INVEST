@@ -64,7 +64,8 @@ export function generateInvoicePdf(inv) {
   y += 21; const half = (W - 28 - 6) / 2;
   doc.setDrawColor(...boxbd); doc.setFillColor(...white); doc.roundedRect(14, y, half, 30, 1.5, 1.5, "S"); doc.roundedRect(14 + half + 6, y, half, 30, 1.5, 1.5, "S");
   doc.setFont("helvetica", "bold"); doc.setFontSize(6.5); doc.setTextColor(...black); doc.text("REMETENTE", 19, y + 7); doc.text("PAGAMENTO A", 19 + half + 6, y + 7);
-  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...black); doc.text("NOME DO REMETENTE", 19, y + 14);
+  const senderName = (inv.sender && inv.sender.name) ? String(inv.sender.name) : "—";
+  doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...black); doc.text(senderName.slice(0, 34), 19, y + 14);
   const px = 19 + half + 6;
   doc.setFontSize(11); doc.setTextColor(...black); doc.text(String(r.name || b.holder || "—").slice(0, 34), px, y + 13.5);
   doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...gray);

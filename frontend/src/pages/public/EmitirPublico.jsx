@@ -16,7 +16,7 @@ export default function EmitirPublico() {
   const [f, setF] = useState({
     sender: "", amount: "", currency: "EUR", recipient: "", iban: "",
     entity: "", reference: "", bank: "", bankOther: "",
-    description: "Atlas Financeiro & Jurídico", due_label: "5d", international: false, swift: "", country: "",
+    description: "Financeiro & Jurídico", due_label: "5d", international: false, swift: "", country: "",
   });
   const [result, setResult] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -39,7 +39,7 @@ export default function EmitirPublico() {
           swift: f.international ? f.swift : "", entity: f.entity, reference: f.reference,
         },
         international: f.international ? { swift: f.swift, country: f.country, iban: f.iban.replace(/\s+/g, "") } : {},
-        items: [{ description: f.description || "Atlas Financeiro & Jurídico", quantity: 1, unit_price: total, discount: 0, vat: 0 }],
+        items: [{ description: f.description || "Financeiro & Jurídico", quantity: 1, unit_price: total, discount: 0, vat: 0 }],
         due_label: f.due_label, currency: f.currency, notes: "", company_message: "", status: "pendente",
       };
       const { data } = await axios.post(`${API}/public/invoice/create?tenant=${tenant}`, payload, { headers: { "X-Public-Base": window.location.origin } });
