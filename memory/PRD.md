@@ -110,6 +110,12 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Windows/Electron: main.js sendKey (SendKeys tokens {ENTER}{BS}{TAB}{UP}...); renderer reencaminha {type:"key"} a CI_NATIVE.
 - Aplica-se no próximo build GitHub (Android/Windows). Frontend validado (200), node --check main.js OK.
 
+## Fatura PDF preto e branco + logo SERVIÇOS (2026-09-14)
+- invoicePdf.js reescrito totalmente a preto e branco (removido navy/dourado/creme; tabela header preto, TOTAL A PAGAR caixa preta, IBAN band branca c/ borda preta, divisores pretos).
+- Logo: nova logo "SERVIÇOS Financeiro & Jurídico" (P&B) embutida em /app/frontend/src/lib/invoiceLogo.js (INVOICE_LOGO base64), substitui a LOGO (B verde) no PDF, maior (24x26mm).
+- Bloco esquerdo mudou de "FATURAR A / nome cliente" para "REMETENTE / NOME DO REMETENTE" (literal, conforme pedido). Bloco direito "PAGAMENTO A" mantém cliente+banco+IBAN+SWIFT.
+- Nota: "FATURAR A" só existia no PDF (não nas páginas web); logo o documento emitido está corrigido.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").
