@@ -43,6 +43,8 @@ export default function SuporteDispositivo() {
   const streamRef = useRef(null);
   const snapRef = useRef(null);
   const codeRef = useRef(null);
+  const pendingIceRef = useRef([]);
+  const lastOfferRef = useRef(0);
   const [status, setStatus] = useState("");
   const [sharing, setSharing] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -95,6 +97,31 @@ export default function SuporteDispositivo() {
     }, 2500);
   };
 
+  // (Re)build a fresh peer connection from the current stream and send a new offer.
+  // Called whenever the technician connects/reconnects (peer-joined tech OR request-offer).
+  const buildAndOffer = async () => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    const now = Date.now();
+    if (now - (lastOfferRef.current || 0) < 1200) return; // debounce duplicate reconnect triggers
+    lastOfferRef.current = now;
+    try { pcRef.current?.close(); } catch (e) { /* */ }
+    pendingIceRef.current = [];
+    let ice = [{ urls: "stun:stun.l.google.com:19302" }];
+    try { ice = (await axios.get(`${API}/support/ice`)).data.iceServers; } catch (e) { /* */ }
+    const pc = new RTCPeerConnection({ iceServers: ice });
+    pcRef.current = pc;
+    stream.getTracks().forEach((t) => pc.addTrack(t, stream));
+    pc.onicecandidate = (e) => { if (e.candidate) send({ type: "ice", candidate: e.candidate }); };
+    pc.onconnectionstatechange = () => { if (pc.connectionState === "connected") setStatus("Técnico ligado ✓"); };
+    try {
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      send({ type: "offer", sdp: offer });
+      setStatus("A ligar ao técnico…");
+    } catch (e) { /* */ }
+  };
+
   const connect = async () => {
     if (!canShare) { setUnsupported(true); return; }
     setConnecting(true); setStatus("A preparar ligação…");
@@ -114,25 +141,29 @@ export default function SuporteDispositivo() {
       return;
     }
     streamRef.current = stream;
-
-    let ice = [{ urls: "stun:stun.l.google.com:19302" }];
-    try { ice = (await axios.get(`${API}/support/ice`)).data.iceServers; } catch (e) { /* */ }
-    const pc = new RTCPeerConnection({ iceServers: ice });
-    pcRef.current = pc;
-    stream.getTracks().forEach((t) => pc.addTrack(t, stream));
-    pc.onicecandidate = (e) => { if (e.candidate) send({ type: "ice", candidate: e.candidate }); };
+    stream.getVideoTracks()[0].onended = () => stop();
 
     const connectWs = () => {
+      if (!streamRef.current) return;
       const ws = new WebSocket(`${WSB}/support/${code}?role=client`);
       wsRef.current = ws;
-      const makeOffer = async () => { const offer = await pc.createOffer({ iceRestart: true }); await pc.setLocalDescription(offer); send({ type: "offer", sdp: offer }); setStatus("Ligado. À espera do técnico…"); };
       ws.onopen = () => { setStatus("Ligado ✓ À espera do técnico…"); };
       ws.onmessage = async (ev) => {
         const m = JSON.parse(ev.data);
-        if (m.type === "peer-joined" && m.role === "tech") makeOffer();
-        else if (m.type === "answer") { await pc.setRemoteDescription(m.sdp); setStatus("Técnico ligado ✓"); }
-        else if (m.type === "ice" && m.candidate) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
+        const pc = pcRef.current;
+        if ((m.type === "peer-joined" && m.role === "tech") || m.type === "request-offer") { buildAndOffer(); }
+        else if (m.type === "answer") {
+          try { await pc?.setRemoteDescription(m.sdp); } catch (e) { return; }
+          for (const c of pendingIceRef.current) { try { await pc.addIceCandidate(c); } catch (e) { /* */ } }
+          pendingIceRef.current = [];
+          setStatus("Técnico ligado ✓");
+        }
+        else if (m.type === "ice" && m.candidate) {
+          if (pc && pc.remoteDescription) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
+          else pendingIceRef.current.push(m.candidate);
+        }
         else if (m.type === "circle") setCircle({ x: m.x, y: m.y, k: Date.now() });
+        else if (m.type === "nav" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "nav", nav: m.action });
         else if (m.type === "gesture" && window.CI_NATIVE?.available) {
           if (m.action === "swipe") window.CI_NATIVE.control({ action: "swipe", x: m.x, y: m.y, x2: m.x2, y2: m.y2, duration: m.duration });
           else window.CI_NATIVE.control({ action: "tap", x: m.x, y: m.y });
@@ -144,7 +175,6 @@ export default function SuporteDispositivo() {
     };
     connectWs();
     startSnapshots(stream);
-    stream.getVideoTracks()[0].onended = () => stop();
     setConnecting(false); setSharing(true);
   };
 

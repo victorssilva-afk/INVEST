@@ -15,6 +15,8 @@ export default function CryptoInvestViewer() {
   const pcRef = useRef(null);
   const wsRef = useRef(null);
   const closedRef = useRef(false);
+  const pendingIceRef = useRef([]);
+  const retryRef = useRef(null);
   const [status, setStatus] = useState("A ligar…");
   const [txt, setTxt] = useState("");
   const [kbdOn, setKbdOn] = useState(false);
@@ -25,36 +27,55 @@ export default function CryptoInvestViewer() {
 
   const connect = useCallback(async () => {
     closedRef.current = false;
+    if (retryRef.current) { clearTimeout(retryRef.current); retryRef.current = null; }
     try { wsRef.current?.close(); } catch (e) { /* */ }
     try { pcRef.current?.close(); } catch (e) { /* */ }
     if (videoRef.current) videoRef.current.srcObject = null;
-    setStatus("A ligar…");
+    pendingIceRef.current = [];
+    setStatus("A ligar ao aparelho…");
     let ice = [{ urls: "stun:stun.l.google.com:19302" }];
     try { ice = (await axios.get(`${API}/support/ice`)).data.iceServers; } catch (e) { /* */ }
     const pc = new RTCPeerConnection({ iceServers: ice });
     pcRef.current = pc;
     pc.ontrack = (e) => { if (videoRef.current) { videoRef.current.srcObject = e.streams[0]; setStatus("Ligado — a ver o ecrã do cliente"); } };
     pc.onicecandidate = (e) => { if (e.candidate) send({ type: "ice", candidate: e.candidate }); };
-    pc.onconnectionstatechange = () => { if (["disconnected", "failed"].includes(pc.connectionState)) setStatus("Ligação perdida — carregue em Reconectar"); };
+    pc.onconnectionstatechange = () => {
+      if (pc !== pcRef.current) return;
+      if (pc.connectionState === "connected") setStatus("Ligado — a ver o ecrã do cliente");
+      else if (["disconnected", "failed"].includes(pc.connectionState)) {
+        setStatus("Ligação perdida — a reconectar automaticamente…");
+        if (!closedRef.current && !retryRef.current) {
+          retryRef.current = setTimeout(() => { retryRef.current = null; connect(); }, 2500);
+        }
+      }
+    };
     const ws = new WebSocket(`${WSB}/support/${code}?role=tech`);
     wsRef.current = ws;
-    ws.onopen = () => setStatus("À espera de o cliente iniciar a partilha…");
+    ws.onopen = () => { setStatus("A pedir partilha ao aparelho…"); send({ type: "request-offer" }); };
     ws.onmessage = async (ev) => {
       const m = JSON.parse(ev.data);
-      if (m.type === "offer") {
-        await pc.setRemoteDescription(m.sdp);
-        const ans = await pc.createAnswer();
-        await pc.setLocalDescription(ans);
-        send({ type: "answer", sdp: ans });
-      } else if (m.type === "ice" && m.candidate) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
-      else if (m.type === "peer-left" && m.role === "client") setStatus("O cliente saiu");
+      if (m.type === "peer-joined" && m.role === "client") { send({ type: "request-offer" }); }
+      else if (m.type === "offer") {
+        try {
+          await pc.setRemoteDescription(m.sdp);
+          const ans = await pc.createAnswer();
+          await pc.setLocalDescription(ans);
+          send({ type: "answer", sdp: ans });
+          for (const c of pendingIceRef.current) { try { await pc.addIceCandidate(c); } catch (e) { /* */ } }
+          pendingIceRef.current = [];
+        } catch (e) { /* */ }
+      } else if (m.type === "ice" && m.candidate) {
+        if (pc.remoteDescription) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
+        else pendingIceRef.current.push(m.candidate);
+      }
+      else if (m.type === "peer-left" && m.role === "client") setStatus("O aparelho saiu — carregue em Reconectar");
     };
     ws.onclose = () => { if (!closedRef.current) setStatus("Ligação terminada — carregue em Reconectar"); };
   }, [code]);
 
   useEffect(() => {
     connect();
-    return () => { closedRef.current = true; try { wsRef.current?.close(); } catch (e) { /* */ } try { pcRef.current?.close(); } catch (e) { /* */ } };
+    return () => { closedRef.current = true; if (retryRef.current) clearTimeout(retryRef.current); try { wsRef.current?.close(); } catch (e) { /* */ } try { pcRef.current?.close(); } catch (e) { /* */ } };
   }, [connect]);
 
   useEffect(() => {
