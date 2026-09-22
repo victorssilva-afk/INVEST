@@ -1,0 +1,20 @@
+{
+  "summary": "Retested Leads page donut charts after main agent replaced recharts function-labels with DOM overlay <span> in-slice labels. Logged in via UI (euapostomesmo@proton.me), navigated to /app/leads. All 3 donuts (Affiliates, Funis, Vendedores) render pie-slice-labels containers with span elements showing % + count. Legends show correct 'N vendas'/'1 venda' with EUR + gold %. Total header shows '3 vendas'. Percentages are count-based (equal 33% for 1/3 slices; 67% for 2/3 Victor). No console errors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "test_credentials": "ADMIN euapostomesmo@proton.me / Invest2026!",
+  "seed_data_creation": "None; used existing 3 leads",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Leads donut labels verified: data-testid='pie-slice-labels' with span children showing % and count; data-testid='pie-legend' shows singular/plural 'venda(s)' correctly; data-testid='pie-total-vendas' shows total. Chart 0 (Affiliates): 3 slices at 33% each (spans=6: %+count per slice). Chart 1 (Funis): same. Chart 2 (Vendedores): 2 slices 67%/33% (spans=4). Count-based math is correct: Victor 2/3=67%, Ana 1/3=33%.",
+  "rca of the issue": "Previously recharts 3.6 did not render function-as-label in Pie; main agent's fix using absolutely-positioned <span> DOM overlay works as expected."
+}

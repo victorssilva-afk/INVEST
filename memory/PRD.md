@@ -135,3 +135,10 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").
 - P2: Modo rápido (modal) de emissão de fatura; alertas de preço crypto configuráveis.
 - P2: PWA instalável do painel de Monitorização.
+
+## 2026-09-22 — Leads: gráficos com percentagens e nº de vendas
+- Donuts (Affiliates/Funis/Vendedores) agora dimensionados pela QUANTIDADE de vendas (count).
+- Rótulos de % dentro das fatias via overlay DOM (recharts 3.6 nao renderiza function-as-label).
+- Legenda por item: nome, "N vendas"/"1 venda", valor EUR e % (dourado). Cabecalho mostra total de vendas.
+- Verificado por testing agent: iteration_5 100% frontend.
+- Fix build Android: workflow android-native.yml atualizado setup-android@v4 packages platform-tools (pendente Save to GitHub + re-run).
