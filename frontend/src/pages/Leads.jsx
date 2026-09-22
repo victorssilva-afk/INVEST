@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { eur } from "@/lib/format";
 import { PageHeader, Card, GoldButton } from "@/components/ui/primitives";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
+import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Plus, Trash2, Link2, FileSpreadsheet, Archive, Crown, Clock, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,22 +22,57 @@ const COLORS = ["#D4AF37", "#0B1A30", "#1e3a5f", "#b8952e", "#3b5a7a", "#8a6d1f"
 const empty = { name: "", seller: "", value_eur: "", affiliate: "", funnel: "", type: "Novo", status: "No Answer" };
 
 function PieBox({ title, arr }) {
-  const data = (arr || []).slice(0, 6).map((x) => ({ name: x.name, value: Math.round(x.value) }));
-  const rest = (arr || []).slice(6).reduce((s, x) => s + x.value, 0);
-  if (rest > 0) data.push({ name: "Outros", value: Math.round(rest) });
+  const data = (arr || []).slice(0, 6).map((x) => ({ name: x.name, value: Math.round(x.value), count: x.count || 0 }));
+  const restArr = (arr || []).slice(6);
+  const rest = restArr.reduce((s, x) => s + x.value, 0);
+  const restCount = restArr.reduce((s, x) => s + (x.count || 0), 0);
+  if (rest > 0) data.push({ name: "Outros", value: Math.round(rest), count: restCount });
+  const totalValue = data.reduce((s, x) => s + x.value, 0) || 1;
+  const totalCount = data.reduce((s, x) => s + x.count, 0);
+  const pct = (v) => `${Math.round((v / totalValue) * 100)}%`;
+
+  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value }) => {
+    const p = Math.round((value / totalValue) * 100);
+    if (p < 6) return null;
+    const RAD = Math.PI / 180;
+    const r = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + r * Math.cos(-midAngle * RAD);
+    const y = cy + r * Math.sin(-midAngle * RAD);
+    return (
+      <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700}>
+        {p}%
+      </text>
+    );
+  };
+
   return (
     <Card>
-      <div className="mb-1 font-semibold text-[#0B1A30]">{title}</div>
+      <div className="mb-1 flex items-center justify-between">
+        <span className="font-semibold text-[#0B1A30]">{title}</span>
+        <span className="text-xs font-semibold text-slate-500" data-testid="pie-total-vendas">{totalCount} vendas</span>
+      </div>
       {data.length ? (
-        <ResponsiveContainer width="100%" height={230}>
-          <PieChart>
-            <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={78} innerRadius={38} paddingAngle={2}>
-              {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-            </Pie>
-            <Tooltip formatter={(v) => eur(v)} />
-            <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: 11 }} />
-          </PieChart>
-        </ResponsiveContainer>
+        <>
+          <ResponsiveContainer width="100%" height={200}>
+            <PieChart>
+              <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={45} paddingAngle={2} labelLine={false} label={renderLabel}>
+                {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Pie>
+              <Tooltip formatter={(v, n, p) => [`${eur(v)} · ${p.payload.count} vendas · ${pct(v)}`, p.payload.name]} />
+            </PieChart>
+          </ResponsiveContainer>
+          <div className="mt-2 space-y-1.5" data-testid="pie-legend">
+            {data.map((x, i) => (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} />
+                <span className="min-w-0 flex-1 truncate font-medium text-[#0B1A30]" title={x.name}>{x.name}</span>
+                <span className="shrink-0 font-semibold text-slate-600">{x.count} vendas</span>
+                <span className="shrink-0 tabular-nums text-slate-400">{eur(x.value)}</span>
+                <span className="shrink-0 w-9 text-right font-bold text-[#D4AF37]">{pct(x.value)}</span>
+              </div>
+            ))}
+          </div>
+        </>
       ) : <div className="py-14 text-center text-sm text-slate-400">Sem dados</div>}
     </Card>
   );
