@@ -21,54 +21,64 @@ const STATUS_CLS = {
 const COLORS = ["#D4AF37", "#0B1A30", "#1e3a5f", "#b8952e", "#3b5a7a", "#8a6d1f", "#64748b"];
 const empty = { name: "", seller: "", value_eur: "", affiliate: "", funnel: "", type: "Novo", status: "No Answer" };
 
+const H = 200, IR = 45, OR = 80, LR = (IR + OR) / 2, CY = H / 2;
+const vendasLabel = (n) => `${n} ${n === 1 ? "venda" : "vendas"}`;
+
 function PieBox({ title, arr }) {
   const data = (arr || []).slice(0, 6).map((x) => ({ name: x.name, value: Math.round(x.value), count: x.count || 0 }));
   const restArr = (arr || []).slice(6);
   const rest = restArr.reduce((s, x) => s + x.value, 0);
   const restCount = restArr.reduce((s, x) => s + (x.count || 0), 0);
   if (rest > 0) data.push({ name: "Outros", value: Math.round(rest), count: restCount });
-  const totalValue = data.reduce((s, x) => s + x.value, 0) || 1;
-  const totalCount = data.reduce((s, x) => s + x.count, 0);
-  const pct = (v) => `${Math.round((v / totalValue) * 100)}%`;
+  const totalCount = data.reduce((s, x) => s + x.count, 0) || 1;
+  const totalValue = data.reduce((s, x) => s + x.value, 0);
+  const pct = (c) => `${Math.round((c / totalCount) * 100)}%`;
 
-  const renderLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, value }) => {
-    const p = Math.round((value / totalValue) * 100);
-    if (p < 6) return null;
-    const RAD = Math.PI / 180;
-    const r = innerRadius + (outerRadius - innerRadius) * 0.5;
-    const x = cx + r * Math.cos(-midAngle * RAD);
-    const y = cy + r * Math.sin(-midAngle * RAD);
-    return (
-      <text x={x} y={y} fill="#fff" textAnchor="middle" dominantBaseline="central" fontSize={11} fontWeight={700}>
-        {p}%
-      </text>
-    );
-  };
+  // Compute in-slice percentage label positions (recharts default: start 0°, counter-clockwise)
+  let acc = 0;
+  const labels = data.map((x) => {
+    const span = (x.count / totalCount) * 360;
+    const mid = acc + span / 2;
+    acc += span;
+    const p = Math.round((x.count / totalCount) * 100);
+    const rad = (-mid * Math.PI) / 180;
+    return { p, x: LR * Math.cos(rad), y: LR * Math.sin(rad), show: p >= 6 };
+  });
 
   return (
     <Card>
       <div className="mb-1 flex items-center justify-between">
         <span className="font-semibold text-[#0B1A30]">{title}</span>
-        <span className="text-xs font-semibold text-slate-500" data-testid="pie-total-vendas">{totalCount} vendas</span>
+        <span className="text-xs font-semibold text-slate-500" data-testid="pie-total-vendas">{vendasLabel(totalCount)}</span>
       </div>
       {data.length ? (
         <>
-          <ResponsiveContainer width="100%" height={200}>
-            <PieChart>
-              <Pie data={data} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80} innerRadius={45} paddingAngle={2} labelLine={false} label={renderLabel}>
-                {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-              </Pie>
-              <Tooltip formatter={(v, n, p) => [`${eur(v)} · ${p.payload.count} vendas · ${pct(v)}`, p.payload.name]} />
-            </PieChart>
-          </ResponsiveContainer>
+          <div className="relative" style={{ height: H }}>
+            <ResponsiveContainer width="100%" height={H}>
+              <PieChart>
+                <Pie data={data} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={OR} innerRadius={IR} paddingAngle={2}>
+                  {data.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                </Pie>
+                <Tooltip formatter={(v, n, p) => [`${vendasLabel(p.payload.count)} · ${eur(p.payload.value)} · ${pct(p.payload.count)}`, p.payload.name]} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="pointer-events-none absolute inset-0" data-testid="pie-slice-labels">
+              {labels.map((l, i) => l.show ? (
+                <span key={i} className="absolute text-[11px] font-bold text-white drop-shadow"
+                  style={{ left: `calc(50% + ${l.x}px)`, top: `${CY + l.y}px`, transform: "translate(-50%, -50%)" }}>
+                  {l.p}%
+                </span>
+              ) : null)}
+            </div>
+          </div>
           <div className="mt-2 space-y-1.5" data-testid="pie-legend">
             {data.map((x, i) => (
               <div key={i} className="flex items-center gap-2 text-xs">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: COLORS[i % COLORS.length] }} />
                 <span className="min-w-0 flex-1 truncate font-medium text-[#0B1A30]" title={x.name}>{x.name}</span>
-                <span className="shrink-0 font-semibold text-slate-600">{x.count} vendas</span>
+                <span className="shrink-0 font-semibold text-slate-600">{vendasLabel(x.count)}</span>
                 <span className="shrink-0 tabular-nums text-slate-400">{eur(x.value)}</span>
-                <span className="shrink-0 w-9 text-right font-bold text-[#D4AF37]">{pct(x.value)}</span>
+                <span className="shrink-0 w-9 text-right font-bold text-[#D4AF37]">{pct(x.count)}</span>
               </div>
             ))}
           </div>

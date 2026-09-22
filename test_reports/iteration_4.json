@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only verification of the Leads page donut chart changes. Login as admin worked; navigated to /app/leads. Custom legend (data-testid='pie-legend') renders exactly as specified for all three charts (Affiliates/Funis/Vendedores) with color dot, name, 'N vendas', EUR value, and percentage in gold (#D4AF37). Header total 'N vendas' (data-testid='pie-total-vendas') renders correctly on all three charts ('3 vendas'). Vendedores chart correctly shows sellers with counts (Victor 2 vendas / Ana 1 vendas) matching the /api/leads/stats top_sellers response. No console errors observed. However, the in-slice percentage labels (the white bold '%' text placed inside the donut arcs by the renderLabel function) do NOT render — an SVG-wide scan found 0 <text> elements in every recharts svg on the page, and the zoomed screenshot confirms the donut arcs render without any labels inside them. Everything else in the requested change works.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Leads.jsx > PieBox (renderLabel)", "issue": "Percentage labels inside donut slices are not rendered. With recharts 3.6.0 the `<Pie label={renderLabel}>` function-as-label pattern is not producing any <text> elements. Legend percentages render fine; only the in-arc labels are missing. Likely recharts v3 API change — try passing the label as an element (e.g. `label={<CustomLabel />}` where CustomLabel is a component reading props via context) or use `<LabelList dataKey=\"value\" content={renderLabel} />` inside <Pie>, or force it with `isAnimationActive={false}` + returning a group. Reproduced with seeded data (3 leads, values 1200/800/300 → 52%/35%/13%, all should be rendered since >6%).", "selector": "svg text (0 found)", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix in-slice percentage labels on the three donut charts in /app/frontend/src/pages/Leads.jsx (PieBox). recharts 3.6.0 likely requires the label to be passed as a React element/component or via <LabelList content={renderLabel} />. After fix, re-verify that SVG contains <text> nodes with '%' for slices >=6%."
+  ],
+  "critical_code_review_comments": [
+    "Minor: legend shows '1 vendas' (should be '1 venda' singular) — PT grammar polish.",
+    "renderLabel uses value/totalValue (EUR share) as percentage. Spec says 'percentages around the charts and in front of each corresponding part (quantity, etc)'. If percentages should reflect sales COUNT rather than EUR value, both the label and legend `pct(x.value)` need to use `x.count/totalCount`. Please confirm intended metric with product owner."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a", "frontend": "85%"},
+  "test_credentials": "ADMIN euapostomesmo@proton.me / Invest2026! — login verified working; token stored in localStorage as 'invest_token'.",
+  "seed_data_creation": "No new seed data created; used existing 3 leads (Lead Teste/Victor/AffX/Funil A/1200€, L2/Ana/15.457/Trading com IA/800€, L3/Victor/22.100/Cripto/300€).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Custom legend, pie-total-vendas header, and 'N vendas' per seller are all confirmed working. Only the in-donut percentage labels are missing (renderLabel not invoked / not rendering under recharts 3.6.0). After main agent fixes, verify with: navigate to /app/leads and evaluate `document.querySelectorAll('svg text').length > 0` — should be >=1 per chart for slices >=6%.",
+  "rca of the issue": "recharts 3.x changed how the `label` prop is resolved on <Pie>. When a plain function is passed as `label`, the function may not be executed as a valid Label renderer. Recommended fix: convert renderLabel into a named component `const RenderLabel = (props) => (...)` and either pass it as `label={<RenderLabel />}` OR use `<LabelList dataKey=\"value\" content={<RenderLabel />} />` as a child of <Pie>. The legend/tooltip continue to work because they use different APIs."
+}
