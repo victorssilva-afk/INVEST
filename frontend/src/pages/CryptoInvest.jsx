@@ -48,7 +48,7 @@ function SessionPreview({ code, ended }) {
 }
 
 export default function CryptoInvest() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout, ready } = useAuth();
   const nav = useNavigate();
   const isAdmin = user?.role === "admin";
   const [sessions, setSessions] = useState([]);
@@ -60,7 +60,7 @@ export default function CryptoInvest() {
 
   const load = async () => { try { const { data } = await api.get("/support/sessions"); setSessions(data); } catch (e) { /* */ } };
   const loadAgents = async () => { try { const { data } = await api.get("/support/agents"); setAgents(data); } catch (e) { /* */ } };
-  useEffect(() => { if (!loading && !user) nav("/crypto-invest"); }, [loading, user, nav]);
+  useEffect(() => { if (ready && !user) nav("/crypto-invest"); }, [ready, user, nav]);
   useEffect(() => { load(); if (user?.role === "admin") loadAgents(); (async () => { try { const { data } = await api.get("/support/my-link"); setMyToken(data.token); } catch (e) { /* */ } })(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [user]);
 
   const end = async (code) => { try { await api.post(`/support/sessions/${code}/end`); load(); } catch (e) { toast.error(apiError(e)); } };

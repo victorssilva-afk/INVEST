@@ -1,0 +1,39 @@
+{
+  "summary": "Tested Crypto.Invest remote-support reconnect fix. Backend WebSocket signaling contract (POST /api/public/support/connect + WS /api/ws/support/{code}) fully verified via 7 pytest cases in /app/backend/tests/test_support_signaling.py — all pass (7/7). Contract test simulates exact viewer-only Reconnect flow: viewer sends {type:'request-offer'} → client (passive) receives it → replies with new {type:'offer'} → viewer sends {type:'answer'} → ICE relayed both ways. Also verified: admin login, /api/auth/me, /api/support/ice, /api/support/sessions listing includes the newly registered device, device_id-based reuse of session code. Frontend playwright: admin logged in via /crypto-invest login, /crypto-invest/painel loaded and opened preview WebSockets (role=preview) for the registered session code — panel sees the device. Could not visually validate the in-viewer request-offer WS frames because a hard navigation (page.goto) to /crypto-invest/sessao/{code} redirects to /crypto-invest login due to a real code bug: viewer & panel destructure {loading} from useAuth() but AuthContext exposes 'ready' (not 'loading'), so during initial /auth/me the guard `!loading && !user` becomes `true && !null=true` and redirects before user is hydrated. Reconnect works when navigating via internal SPA link (user already in state), but F5 / direct URL / new tab on viewer will bounce to login.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "CryptoInvestViewer.jsx (also CryptoInvest.jsx)",
+        "issue": "Destructures `loading` from useAuth() but AuthContext exports `ready` (not `loading`). So `loading` is undefined and the guard `if (!loading && !user) nav('/crypto-invest')` fires immediately on mount before /auth/me resolves, redirecting authenticated users to login on any hard reload / direct URL / new-tab open of /crypto-invest/sessao/{code} or /crypto-invest/painel.",
+        "selector": "[data-testid=\"ci-reconnect\"] page; useAuth() destructure",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_support_signaling.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix useAuth destructure in CryptoInvestViewer.jsx and CryptoInvest.jsx: replace `const { user, loading } = useAuth();` with `const { user, ready } = useAuth();` and update the guard to `if (ready && !user) nav('/crypto-invest')`. Same applies to any other page using `loading` from AuthContext.",
+    "After the fix, re-verify /crypto-invest/sessao/{code} loads on F5/direct URL and that ci-reconnect WS frame `{type:'request-offer'}` is observable in the browser network panel."
+  ],
+  "critical_code_review_comments": [
+    "AuthContext contract mismatch: provider exposes `ready` but consumers destructure `loading` — silent bug that redirects logged-in users on hard reload of protected Crypto.Invest routes.",
+    "WebRTC reconnect contract implementation in CryptoInvestViewer.connect() and SuporteDispositivo.buildAndOffer() is correct: viewer sends request-offer on ws.onopen and on peer-joined(client); client debounces buildAndOffer() 1200ms and buffers ICE until answer/remoteDescription set; viewer auto-retries on disconnected/failed after 2.5s. Backend relay verified to forward all message types unchanged.",
+    "Minor: viewer never sends peer-left explicitly — relies on WS close; the client's setStatus('O aparelho saiu…') requires peer-left(client), which backend does not emit in the code shown (only peer-joined). Confirm peer-left flow if used by UI (lines ~1720+ of server.py were truncated)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_support_signaling.py (new)"
+  ],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "partial — panel + login OK; viewer blocked by AuthContext key mismatch on hard reload"},
+  "test_credentials": "ADMIN euapostomesmo@proton.me / Invest2026!",
+  "seed_data_creation": "Ephemeral support_sessions created via /api/public/support/connect with device_id prefixed TEST_ (safe to leave; reusable).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Reconnect signaling contract is proven end-to-end at the WS relay level via /app/backend/tests/test_support_signaling.py (pytest -n 0 required due to pytest.ini xdist config). To test the UI Reconectar button live, first fix AuthContext key mismatch (`loading` → `ready`) in CryptoInvestViewer.jsx & CryptoInvest.jsx, then navigate to painel via SPA link and click 'Abrir ecrã' to reach the viewer without a full reload. Capture WS frames with page.on('websocket') → framesent/framereceived; framesent handlers receive the payload as a plain str, not an object with .payload. To simulate a passive client without getDisplayMedia, open a second browser page that only opens a client-role WebSocket and replies to {type:'request-offer'} with a fake offer payload.",
+  "rca of the issue": "The user-facing reconnect fix at the WebRTC/WS layer is correctly implemented and the backend relay works. However, a pre-existing bug in the auth guard (useAuth destructures non-existent `loading` field instead of `ready`) intermittently prevents technicians from reaching the viewer on hard reload / direct URL — this may masquerade as 'Reconectar não funciona' if the user refreshes the viewer page. Recommend main agent fix the `loading`/`ready` mismatch so the reconnect fix is user-visible in all navigation scenarios."
+}

@@ -9,7 +9,7 @@ const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws"
 
 export default function CryptoInvestViewer() {
   const { code } = useParams();
-  const { user, loading } = useAuth();
+  const { user, ready } = useAuth();
   const nav = useNavigate();
   const videoRef = useRef(null);
   const pcRef = useRef(null);
@@ -21,7 +21,7 @@ export default function CryptoInvestViewer() {
   const [txt, setTxt] = useState("");
   const [kbdOn, setKbdOn] = useState(false);
 
-  useEffect(() => { if (!loading && !user) nav("/crypto-invest"); }, [loading, user, nav]);
+  useEffect(() => { if (ready && !user) nav("/crypto-invest"); }, [ready, user, nav]);
 
   const send = (m) => { try { wsRef.current?.readyState === 1 && wsRef.current.send(JSON.stringify(m)); } catch (e) { /* */ } };
 
