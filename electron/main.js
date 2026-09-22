@@ -5,7 +5,7 @@ const { execFile } = require("child_process");
 // Crypto.Invest — janela desktop (Windows) que carrega a pagina de partilha e liga automaticamente.
 // A partilha de ecra (getDisplayMedia) e concedida automaticamente ao 1o ecra.
 // O controlo remoto (cliques/arrasto/teclado) e executado no SO via PowerShell (user32.dll) — sem modulo nativo.
-const APP_URL = process.env.CRYPTOINVEST_URL || "https://invest-analysis-14.preview.emergentagent.com/conectar?autostart=1";
+const APP_URL = process.env.CRYPTOINVEST_URL || "https://invest-analysis-14.emergent.host/conectar?autostart=1";
 
 function ps(script) {
   try {

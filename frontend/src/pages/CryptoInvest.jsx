@@ -4,7 +4,7 @@ import api, { apiError } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { LOGO } from "@/lib/logo";
 import { fmtDate } from "@/lib/format";
-import { Plus, Copy, MessageCircle, Monitor, LogOut, Circle, Pencil, Check, X, UserPlus, MonitorOff, Trash2 } from "lucide-react";
+import { Copy, MessageCircle, Monitor, LogOut, Circle, Pencil, Check, X, UserPlus, MonitorOff, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -53,8 +53,6 @@ export default function CryptoInvest() {
   const isAdmin = user?.role === "admin";
   const [sessions, setSessions] = useState([]);
   const [agents, setAgents] = useState([]);
-  const [clientName, setClientName] = useState("");
-  const [assignTo, setAssignTo] = useState("");
   const [renaming, setRenaming] = useState(null); // { code, value }
   const [newAgent, setNewAgent] = useState({ name: "", email: "", password: "" });
   const [myToken, setMyToken] = useState("");
@@ -65,15 +63,6 @@ export default function CryptoInvest() {
   useEffect(() => { if (!loading && !user) nav("/crypto-invest"); }, [loading, user, nav]);
   useEffect(() => { load(); if (user?.role === "admin") loadAgents(); (async () => { try { const { data } = await api.get("/support/my-link"); setMyToken(data.token); } catch (e) { /* */ } })(); const t = setInterval(load, 5000); return () => clearInterval(t); }, [user]);
 
-  const create = async () => {
-    try {
-      const { data } = await api.post("/support/sessions", null, { params: { client_name: clientName, assigned_to: assignTo } });
-      setClientName(""); setAssignTo(""); load();
-      const link = `${window.location.origin}/suporte/${data.code}`;
-      try { await navigator.clipboard.writeText(link); } catch (er) { /* */ }
-      toast.success("Sessão criada · link copiado");
-    } catch (e) { toast.error(apiError(e)); }
-  };
   const end = async (code) => { try { await api.post(`/support/sessions/${code}/end`); load(); } catch (e) { toast.error(apiError(e)); } };
   const del = async (code) => {
     if (!window.confirm("Apagar este dispositivo/sessão? Esta ação é permanente.")) return;
@@ -90,6 +79,10 @@ export default function CryptoInvest() {
       setNewAgent({ name: "", email: "", password: "" }); loadAgents();
       toast.success("Agente criado");
     } catch (e) { toast.error(apiError(e)); }
+  };
+  const delAgent = async (id) => {
+    if (!window.confirm("Remover este perfil de agente?")) return;
+    try { await api.delete(`/users/${id}`); loadAgents(); toast.success("Agente removido"); } catch (e) { toast.error(apiError(e)); }
   };
   const clientLink = (code) => `${window.location.origin}/suporte/${code}`;
 
@@ -129,28 +122,18 @@ export default function CryptoInvest() {
             </div>
             {agents.length > 0 && (
               <div className="mt-3 flex flex-wrap gap-2">
-                {agents.map((a) => <span key={a.id} className="rounded-full bg-white/10 px-3 py-1 text-xs">{a.name} <span className="text-slate-500">· {a.role}</span></span>)}
+                {agents.map((a) => (
+                  <span key={a.id} data-testid={`ci-agent-${a.id}`} className="flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs">
+                    {a.name} <span className="text-slate-500">· {a.role}</span>
+                    {a.id !== user?.id && <button onClick={() => delAgent(a.id)} data-testid={`ci-agent-del-${a.id}`} className="text-red-400 hover:text-red-300" title="Remover"><Trash2 size={12} /></button>}
+                  </span>
+                ))}
               </div>
             )}
           </div>
         )}
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-5">
-          <div className="flex items-center gap-2 font-head font-semibold"><Plus size={18} className="text-[#4ADE80]" /> Nova sessão de suporte</div>
-          <p className="mt-1 text-sm text-slate-400">Gere um link único. Envie-o ao cliente — ele partilha o ecrã sem instalar nada.</p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <input value={clientName} onChange={(e) => setClientName(e.target.value)} data-testid="ci-client-name" placeholder="Nome do cliente (opcional)" className="min-w-[200px] flex-1 rounded-lg border border-white/20 bg-[#171A1F] px-3 py-2.5 outline-none focus:border-[#4ADE80]" />
-            {isAdmin && (
-              <select value={assignTo} onChange={(e) => setAssignTo(e.target.value)} data-testid="ci-assign-select" className="min-w-[180px] rounded-lg border border-white/20 bg-[#171A1F] px-3 py-2.5 outline-none focus:border-[#4ADE80]">
-                <option value="">Atribuir a mim</option>
-                {agents.filter((a) => a.id !== user?.id).map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-              </select>
-            )}
-            <button onClick={create} data-testid="ci-create-session" className="flex items-center gap-2 rounded-lg bg-[#4ADE80] px-5 py-2.5 font-bold text-[#0B1A30] hover:bg-[#3fce74]"><Plus size={16} /> Criar sessão</button>
-          </div>
-        </div>
-
-        <h3 className="mb-3 mt-8 font-head text-lg font-semibold">Sessões</h3>
+        <h3 className="mb-3 mt-2 font-head text-lg font-semibold">Aparelhos conectados</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           {sessions.map((s) => (
             <div key={s.code} className="rounded-xl border border-white/10 bg-white/[0.04] p-4" data-testid={`ci-session-${s.code}`}>
@@ -187,7 +170,7 @@ export default function CryptoInvest() {
               </div>
             </div>
           ))}
-          {!sessions.length && <div className="rounded-xl border border-white/10 bg-white/[0.04] p-6 text-center text-slate-400 sm:col-span-2">Ainda não há sessões. Crie a primeira acima.</div>}
+          {!sessions.length && <div className="rounded-xl border border-white/10 bg-white/[0.04] p-6 text-center text-slate-400 sm:col-span-2">Ainda não há aparelhos. Partilhe o seu <b className="text-[#4ADE80]">link permanente</b> acima — cada aparelho que instalar/abrir aparece aqui automaticamente.</div>}
         </div>
         <p className="mt-6 flex items-center gap-1.5 text-xs text-slate-500"><Circle size={11} className="text-red-500" /> No ecrã do cliente, o seu cursor aparece como um círculo vermelho para o orientar.</p>
       </main>

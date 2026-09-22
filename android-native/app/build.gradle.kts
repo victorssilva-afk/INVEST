@@ -14,7 +14,7 @@ android {
         versionCode = 1
         versionName = "1.0"
         // URL do backend (mesma origem do CRM)
-        buildConfigField("String", "BACKEND_URL", "\"https://invest-analysis-14.preview.emergentagent.com\"")
+        buildConfigField("String", "BACKEND_URL", "\"https://invest-analysis-14.emergent.host\"")
     }
 
     buildFeatures {

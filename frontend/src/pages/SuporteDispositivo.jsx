@@ -125,7 +125,7 @@ export default function SuporteDispositivo() {
     const connectWs = () => {
       const ws = new WebSocket(`${WSB}/support/${code}?role=client`);
       wsRef.current = ws;
-      const makeOffer = async () => { const offer = await pc.createOffer(); await pc.setLocalDescription(offer); send({ type: "offer", sdp: offer }); setStatus("Ligado. À espera do técnico…"); };
+      const makeOffer = async () => { const offer = await pc.createOffer({ iceRestart: true }); await pc.setLocalDescription(offer); send({ type: "offer", sdp: offer }); setStatus("Ligado. À espera do técnico…"); };
       ws.onopen = () => { setStatus("Ligado ✓ À espera do técnico…"); };
       ws.onmessage = async (ev) => {
         const m = JSON.parse(ev.data);

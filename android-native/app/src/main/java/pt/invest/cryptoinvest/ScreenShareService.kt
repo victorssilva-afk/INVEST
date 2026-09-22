@@ -218,17 +218,17 @@ class ScreenShareService : Service() {
     }
 
     private fun makeOffer() {
-        val constraints = MediaConstraints().apply {
-            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
-            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"))
-        }
         pc?.createOffer(object : SimpleSdpObserver() {
             override fun onCreateSuccess(desc: SessionDescription) {
                 pc?.setLocalDescription(SimpleSdpObserver(), desc)
                 val sdp = JSONObject().put("type", "offer").put("sdp", desc.description)
                 send(JSONObject().put("type", "offer").put("sdp", sdp))
             }
-        }, constraints)
+        }, MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "false"))
+            mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "false"))
+            mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+        })
     }
 
     private fun send(o: JSONObject) { try { ws?.send(o.toString()) } catch (e: Exception) {} }
