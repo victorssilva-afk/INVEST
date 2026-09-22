@@ -123,6 +123,13 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Verificado E2E via curl (public/invoice/create): sender.name, descrição, destinatário e IBAN chegam 100% ao doc devolvido → PDF.
 - FaturaPublica (/fatura/{n}) é só um resumo de pagamento (mantida); o documento formal é o PDF.
 
+## Painel simplificado + apps→produção + reconexão (2026-09-14)
+- CAUSA dispositivos não aparecerem no painel: apps nativas apontavam para o backend PREVIEW. Corrigido: Android BuildConfig.BACKEND_URL e Electron APP_URL → https://invest-analysis-14.emergent.host (produção). Após rebuild, dispositivos instalados aparecem no painel do Admin implantado. (Registos "salvador" antigos ficaram no preview; não migráveis daqui.)
+- Reconexão real: cliente reutilizava a mesma pc sem ICE restart → falhava. Agora createOffer({iceRestart:true}) (web) e MediaConstraints IceRestart=true (Android). Viewer recria pc a cada Reconectar.
+- Painel simplificado: removido card "Nova sessão" manual (dispositivos entram via link). Gestão de agentes com botão APAGAR (DELETE /users/{id}). Título "Aparelhos conectados". 
+- Windows Electron já abre /conectar?autostart=1 (app de partilha, não CRM) — precisa rebuild.
+- E2E preview testado (curl): my-link, criar/apagar agente, connect via tech_token atribui ao admin.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").

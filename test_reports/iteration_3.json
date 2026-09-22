@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only E2E test of the simplified Crypto.Invest painel técnico. All 8 requested flows PASS: (1) admin login via ci-login-* redirects to painel; (2) 'O meu link permanente' card shows a valid URL starting with http and containing '/conectar?t=' + Copy button; (3) old 'Nova sessão de suporte' card and ci-create-session button are removed and 'Aparelhos conectados' title is present; (4) agent creation via ci-agent-name/email/password + ci-create-agent adds a new chip data-testid ci-agent-<id>, and ci-agent-del-<id> removes it (window.confirm auto-accepted); admin's own chip has NO delete button (confirmed); (5) POST /api/public/support/connect with tech_token creates a session and it appears in the painel within 6s polling with device_name 'QA Aparelho', status 'À espera', agent 'Administrador INVEST'; (6) rename flow via ci-rename-<code>/ci-rename-input-<code>/ci-rename-save-<code> persists new name; (7) 'Abrir ecrã' navigates to /crypto-invest/sessao/<code> and viewer renders ci-reconnect, ci-fullscreen, ci-nav-back, ci-nav-home, ci-nav-recents, ci-kbd-toggle; clicking ci-reconnect does not break the page; (8) ci-delete-<code> removes the session card. No console errors or pageerrors were captured during the whole flow.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "critical_code_review_comments": [
+    "Agent creation uses Pydantic EmailStr; emails ending in '.test' (RFC-reserved) are rejected with 422. UI only surfaces the raw server toast — consider a friendlier client-side email validation hint so users don't get a cryptic 'reserved name' error.",
+    "The public API /api/public/support/connect requires only a valid tech_token and any device_id — there is no rate limiting evident. Worth considering a per-token/IP throttle so anyone with a leaked link cannot spawn unlimited session records.",
+    "CryptoInvest.jsx effect (line 64) chains multiple concerns (load sessions, agents, my-link, interval) in one useEffect and depends only on [user]; splitting into two effects would improve readability and avoid re-fetching my-link on unrelated user object changes.",
+    "The 'Agente' selector (ci-session-assign-*) doesn't include the current assignee as a placeholder when agents list hasn't loaded yet — first render can show an empty select. Minor."
+  ],
+  "test_report_links": [],
+  "action_items": [
+    "None blocking. Optional: add client-side email validation on ci-agent-email to catch reserved TLDs before hitting the API."
+  ],
+  "updated_files": [],
+  "success_rate": { "backend": "n/a (frontend-only)", "frontend": "100% (8/8 flows PASS, 0 console errors)" },
+  "test_credentials": "Admin: euapostomesmo@proton.me / Invest2026!",
+  "seed_data_creation": "Created and cleaned up: 1 test agent (via UI, then deleted) and 1 test session 'QA Aparelho' (via POST /api/public/support/connect, renamed then deleted).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Painel testids: ci-mylink-card/input/copy, ci-agents-card, ci-agent-name/email/password, ci-create-agent, ci-agent-<userId>, ci-agent-del-<userId>, ci-session-<code>, ci-device-<code>, ci-rename-<code>, ci-rename-input-<code>, ci-rename-save-<code>, ci-open-<code>, ci-delete-<code>, ci-session-assign-<code>. Viewer: ci-reconnect, ci-fullscreen, ci-nav-back/home/recents, ci-kbd-toggle. To simulate a client device without a phone: curl -X POST {BACKEND}/api/public/support/connect -H 'Content-Type: application/json' -d '{\"device_id\":\"...\",\"device_name\":\"...\",\"tech_token\":\"<token from ci-mylink-input>\"}'. NOTE: urllib.request from container sometimes gets 403 from Cloudflare — use curl via subprocess instead. Use valid email domains (example.com); '.test' is rejected by EmailStr with 422.",
+  "rca of the issue": "N/A — all flows behave as intended after main agent's recent fixes (simplified painel, agent management, permanent-link device auto-registration, and polling refresh)."
+}
