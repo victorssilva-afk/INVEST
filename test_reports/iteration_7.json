@@ -1,0 +1,38 @@
+{
+  "summary": "Frontend-only retest of Crypto.Invest auth-guard fix and 'Reconectar' round-trip. All 4 requested checks PASSED: (1) hard reload of /crypto-invest/painel keeps admin on the panel, (2) direct URL load of /crypto-invest/sessao/{code} keeps technician on the viewer, (3) viewer sends {type:'request-offer'} on WS onopen and again when Reconectar is clicked; a paired client peer that replies with a fake offer causes the viewer to setRemoteDescription + createAnswer + send {type:'answer'}, and status becomes 'Ligado — a ver o ecrã do cliente', (4) zero console errors during viewer load and reconnect.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "AuthContext exposes only {user, ready, login, logout}; guards in CryptoInvest.jsx and CryptoInvestViewer.jsx now correctly use `ready` — matches contract.",
+    "CryptoInvestViewer.connect() correctly closes prior pc/ws, rebuilds a fresh RTCPeerConnection with re-fetched ICE, and emits {type:'request-offer'} on ws.onopen + on peer-joined(client). Answer/ICE flow verified end-to-end via paired client peer.",
+    "Minor: ws.onclose in viewer retries only on connectionstatechange path (auto), not on onclose itself. That's fine because the user can click Reconectar manually. No action needed.",
+    "Minor: video element has muted+autoPlay+playsInline — good for autoplay policy. No action needed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped as requested)", "frontend": "100%"},
+  "test_credentials": "admin euapostomesmo@proton.me / Invest2026! (token in localStorage 'invest_token')",
+  "seed_data_creation": "Created support session via POST /api/public/support/connect with device_id='TEST_reconnect_1' -> code=e5657e8c. Not deleted (delete endpoint requires auth; main agent can clean up if desired).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Playwright WebSocket framesent/framereceived handler receives payload as a plain string in this Playwright version — do NOT access .payload attribute. Use `lambda p: p if isinstance(p, str) else str(p)`. Session code e5657e8c may still exist in DB attributed to admin 'euapostomesmo@proton.me' (owner via tech_token flow was not used; session was created without tech_token so owner is null, but shows up in the admin panel via tenant match).",
+  "detailed_evidence": {
+    "panel_f5_final_url": "https://.../crypto-invest/painel (stayed, session card visible)",
+    "viewer_direct_final_url": "https://.../crypto-invest/sessao/e5657e8c (stayed, Reconectar btn visible)",
+    "viewer_ws_frames_on_open": ["{\"type\":\"request-offer\"}"],
+    "viewer_ws_frames_after_reconnect_click": [
+      "{\"type\":\"request-offer\"}",
+      "{\"type\":\"request-offer\"} (2nd, triggered by peer-joined(client))",
+      "{\"type\":\"answer\",\"sdp\":{...real SDP from browser RTCPeerConnection...}}",
+      "{\"type\":\"ice\",\"candidate\":{...host...}}",
+      "{\"type\":\"ice\",\"candidate\":{...srflx...}}"
+    ],
+    "final_status_text": "Ligado — a ver o ecrã do cliente",
+    "console_errors": []
+  }
+}

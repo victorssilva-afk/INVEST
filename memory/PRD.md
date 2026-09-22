@@ -142,3 +142,9 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Legenda por item: nome, "N vendas"/"1 venda", valor EUR e % (dourado). Cabecalho mostra total de vendas.
 - Verificado por testing agent: iteration_5 100% frontend.
 - Fix build Android: workflow android-native.yml atualizado setup-android@v4 packages platform-tools (pendente Save to GitHub + re-run).
+
+## 2026-09-22 — Crypto.Invest: reconexão automática corrigida
+- Viewer envia {type:request-offer} no open e ao clicar Reconectar; cliente reconstrói RTCPeerConnection limpo e devolve nova offer; ICE bufferizada ate remoteDescription.
+- Auto-retry no viewer 2.5s ao cair a ligacao (disconnected/failed).
+- Corrigido bug de auth: viewer/painel usavam useAuth().loading (inexistente) -> agora usam ready; deixou de expulsar o tecnico para login em reload/URL direto.
+- Verificado: iteration_6 (7/7 backend contrato WS) + iteration_7 (100% frontend, request-offer->offer->answer, video reconecta).
