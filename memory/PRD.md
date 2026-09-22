@@ -148,3 +148,9 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Auto-retry no viewer 2.5s ao cair a ligacao (disconnected/failed).
 - Corrigido bug de auth: viewer/painel usavam useAuth().loading (inexistente) -> agora usam ready; deixou de expulsar o tecnico para login em reload/URL direto.
 - Verificado: iteration_6 (7/7 backend contrato WS) + iteration_7 (100% frontend, request-offer->offer->answer, video reconecta).
+
+## 2026-09-22 — App Windows: controlo remoto corrigido (causa raiz)
+- ANTES: cada clique/tecla criava um novo processo powershell.exe + Add-Type (compilacao C#) -> lento e falhava (AV/politica/latencia) -> "controlo nao funciona".
+- AGORA: electron/main.js usa UM processo PowerShell persistente (-NoExit REPL) com o tipo user32/SendKeys carregado UMA vez; comandos tap/swipe/text/key enviados por stdin (instantaneo).
+- Coordenadas continuam absolutas normalizadas 0..65535 (imunes a DPI) no ecra primario.
+- node --check OK em main.js e preload.js. NAO testado em Windows real (limitacao do ambiente) -> requer rebuild do .exe via GitHub Actions (windows.yml) e teste no PC.
