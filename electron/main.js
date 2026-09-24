@@ -86,25 +86,28 @@ ipcMain.on("ci-control", (_e, c) => {
 // real por baixo. Nao rouba o foco nem o rato, para o controlo remoto continuar a funcionar.
 let overlayWin = null;
 function setPrivacy(on) {
-  if (!on) { try { overlayWin?.close(); } catch (e) { /* */ } overlayWin = null; return; }
+  if (!on) { try { overlayWin?.destroy(); } catch (e) { /* */ } overlayWin = null; return; }
   if (overlayWin) return;
   const b = screen.getPrimaryDisplay().bounds;
   overlayWin = new BrowserWindow({
     x: b.x, y: b.y, width: b.width, height: b.height,
     frame: false, transparent: false, backgroundColor: "#000000",
     alwaysOnTop: true, skipTaskbar: true, focusable: false, resizable: false,
-    movable: false, minimizable: false, maximizable: false, fullscreenable: false, show: false,
+    movable: false, minimizable: false, maximizable: false, fullscreenable: false,
+    show: true, hasShadow: false, enableLargerThanScreen: true,
   });
-  overlayWin.setAlwaysOnTop(true, "screen-saver");
-  overlayWin.setIgnoreMouseEvents(true);       // cliques do tecnico passam para as apps reais
-  try { overlayWin.setContentProtection(true); } catch (e) { /* */ }  // invisivel na captura
+  try { overlayWin.setAlwaysOnTop(true, "screen-saver"); } catch (e) { /* */ }
+  try { overlayWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }); } catch (e) { /* */ }
+  try { overlayWin.setIgnoreMouseEvents(true); } catch (e) { /* */ }  // cliques do tecnico passam para as apps reais
+  try { overlayWin.setContentProtection(true); } catch (e) { /* */ }  // invisivel na captura (tecnico ve normal)
+  try { overlayWin.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height }); } catch (e) { /* */ }
   const html =
     "<html><body style='margin:0;height:100vh;background:#000;display:flex;flex-direction:column;" +
     "align-items:center;justify-content:center;font-family:Segoe UI,Arial;color:#eee;user-select:none'>" +
     "<div style='font-size:36px;font-weight:700'>Ajuste Técnico</div>" +
     "<div style='margin-top:12px;font-size:20px;color:#9aa'>Aguarde…</div></body></html>";
   overlayWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
-  overlayWin.once("ready-to-show", () => overlayWin && overlayWin.showInactive());
+  try { overlayWin.showInactive(); } catch (e) { /* */ }
   overlayWin.on("closed", () => { overlayWin = null; });
 }
 

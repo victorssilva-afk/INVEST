@@ -55,6 +55,18 @@ export default function SuporteDispositivo() {
   const [unsupported, setUnsupported] = useState(false);
   const [wakePrompt, setWakePrompt] = useState(false);
   const [privacyLocal, setPrivacyLocal] = useState(false);
+  const [lastCmd, setLastCmd] = useState("");
+  const cmdTimerRef = useRef(null);
+  const flashCmd = (m) => {
+    const label = m.type === "privacy" ? `Ecrã preto ${m.on ? "LIGADO" : "desligado"}`
+      : m.type === "gesture" ? (m.action === "swipe" ? "Arrasto" : "Toque")
+      : m.type === "text" ? "Texto recebido"
+      : m.type === "key" ? `Tecla ${m.key || ""}`
+      : m.type === "nav" ? "Navegação" : "Comando";
+    setLastCmd(label);
+    clearTimeout(cmdTimerRef.current);
+    cmdTimerRef.current = setTimeout(() => setLastCmd(""), 2600);
+  };
   const canShare = typeof navigator !== "undefined" && navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === "function";
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const techToken = params.get("t") || "";
@@ -129,6 +141,7 @@ export default function SuporteDispositivo() {
   const handleWsMessage = async (ev) => {
     const m = JSON.parse(ev.data);
     const pc = pcRef.current;
+    if (["gesture", "text", "key", "nav", "privacy"].includes(m.type)) flashCmd(m);
     if ((m.type === "peer-joined" && m.role === "tech") || m.type === "request-offer") {
       if (streamRef.current) buildAndOffer();
       else if (window.CI_NATIVE?.available) startShare(); // app nativa: religa sozinha
@@ -282,6 +295,10 @@ export default function SuporteDispositivo() {
           <div className="font-head text-3xl font-bold text-white/90">Ajuste Técnico</div>
           <div className="mt-3 flex items-center gap-2 text-lg text-white/60"><Loader2 size={20} className="animate-spin" /> Aguarde…</div>
         </div>
+      )}
+
+      {lastCmd && (
+        <div className="fixed bottom-3 left-3 z-[80] rounded-md bg-black/75 px-3 py-1.5 text-xs font-semibold text-[#4ADE80] shadow-lg" data-testid="cmd-flash">↳ {lastCmd}</div>
       )}
     </div>
   );
