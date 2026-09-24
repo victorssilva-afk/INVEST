@@ -9,7 +9,7 @@ const ISSUER = {
   address: "Rua Henrique Mesquita, nº 257 NA",
   postal: "3220-232 Miranda do Corvo · Portugal",
   if_code: "7847",
-  email: "victor.silva@wexford-advisory.email",
+  email: "victor.silva@wexfordadvisory-ltd.com",
   inst_type: "Instituições de moeda eletrónica com sede na UE — Livre prestação de serviços em PT",
   swift: "BGALPTPLXXX",
 };
@@ -47,7 +47,7 @@ export function generateInvoicePdf(inv) {
   doc.setFontSize(17); doc.setTextColor(...black); doc.text(inv.number || "—", W - 14, 20.5, { align: "right" });
   doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...gray);
   doc.text(`Data de emissão: ${fmtDate(inv.issue_date)}`, W - 14, 25.5, { align: "right" });
-  doc.setTextColor(...soft); doc.text("Original · Documento não certificado", W - 14, 30, { align: "right" });
+  doc.setTextColor(...soft); doc.text("Documento Original", W - 14, 30, { align: "right" });
 
   // divider (preto)
   let y = Math.max(hy + 2, 44);

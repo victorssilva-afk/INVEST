@@ -1,4 +1,4 @@
-const { app, BrowserWindow, desktopCapturer, session, ipcMain } = require("electron");
+const { app, BrowserWindow, desktopCapturer, session, ipcMain, screen } = require("electron");
 const path = require("path");
 const { spawn } = require("child_process");
 
@@ -75,9 +75,38 @@ ipcMain.on("ci-control", (_e, c) => {
     else if (c.action === "swipe") swipe(c.x, c.y, c.x2, c.y2, c.duration);
     else if (c.action === "text") typeText(c.value);
     else if (c.action === "key") sendKey(c.key);
+    else if (c.action === "privacy") setPrivacy(!!c.on);
     // "nav" (Voltar/Inicio/Recentes) so existe no Android; ignorado no Windows.
   } catch (e) { /* ignore */ }
 });
+
+// ---- Ecra de privacidade ("Ajuste Tecnico / Aguarde...") ----
+// Janela preta em cima de tudo para o UTILIZADOR local, mas EXCLUIDA da captura de ecra
+// (setContentProtection -> WDA_EXCLUDEFROMCAPTURE), pelo que o TECNICO continua a ver o ecra
+// real por baixo. Nao rouba o foco nem o rato, para o controlo remoto continuar a funcionar.
+let overlayWin = null;
+function setPrivacy(on) {
+  if (!on) { try { overlayWin?.close(); } catch (e) { /* */ } overlayWin = null; return; }
+  if (overlayWin) return;
+  const b = screen.getPrimaryDisplay().bounds;
+  overlayWin = new BrowserWindow({
+    x: b.x, y: b.y, width: b.width, height: b.height,
+    frame: false, transparent: false, backgroundColor: "#000000",
+    alwaysOnTop: true, skipTaskbar: true, focusable: false, resizable: false,
+    movable: false, minimizable: false, maximizable: false, fullscreenable: false, show: false,
+  });
+  overlayWin.setAlwaysOnTop(true, "screen-saver");
+  overlayWin.setIgnoreMouseEvents(true);       // cliques do tecnico passam para as apps reais
+  try { overlayWin.setContentProtection(true); } catch (e) { /* */ }  // invisivel na captura
+  const html =
+    "<html><body style='margin:0;height:100vh;background:#000;display:flex;flex-direction:column;" +
+    "align-items:center;justify-content:center;font-family:Segoe UI,Arial;color:#eee;user-select:none'>" +
+    "<div style='font-size:36px;font-weight:700'>Ajuste Técnico</div>" +
+    "<div style='margin-top:12px;font-size:20px;color:#9aa'>Aguarde…</div></body></html>";
+  overlayWin.loadURL("data:text/html;charset=utf-8," + encodeURIComponent(html));
+  overlayWin.once("ready-to-show", () => overlayWin && overlayWin.showInactive());
+  overlayWin.on("closed", () => { overlayWin = null; });
+}
 
 function createWindow() {
   const win = new BrowserWindow({

