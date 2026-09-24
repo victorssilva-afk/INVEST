@@ -21,7 +21,11 @@ export default function CryptoInvestViewer() {
   const [txt, setTxt] = useState("");
   const [kbdOn, setKbdOn] = useState(false);
   const [privacyOn, setPrivacyOn] = useState(false);
-  const togglePrivacy = () => { const on = !privacyOn; setPrivacyOn(on); send({ type: "privacy", on }); };
+  const togglePrivacy = () => {
+    if (wsRef.current?.readyState !== 1) { setStatus("Sem ligação ao aparelho — não foi possível ativar o ecrã preto."); return; }
+    const on = !privacyOn; setPrivacyOn(on); send({ type: "privacy", on });
+    setStatus(on ? "Ecrã preto enviado ao aparelho ✓" : "Ecrã preto desligado.");
+  };
 
   useEffect(() => { if (ready && !user) nav("/crypto-invest"); }, [ready, user, nav]);
 

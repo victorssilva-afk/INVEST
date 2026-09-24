@@ -160,3 +160,8 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Cliente de partilha agora mantem WS de PRESENCA sempre aberto (mesmo sem partilhar): tecnico pode "acordar" o aparelho. Se nao estiver a partilhar, mostra prompt central "Reconexao de suporte" com botao Começar (startShare). App nativa religa sozinha.
 - Ecra de privacidade: botao no viewer (ci-privacy-toggle) envia {type:privacy,on}; no Windows/Electron cria janela preta em cima (Ajuste Tecnico/Aguarde) com setContentProtection(true)=excluida da captura + setIgnoreMouseEvents(true)=cliques passam -> utilizador ve preto, tecnico ve normal e continua a controlar. Em browser puro mostra overlay local (privacy-overlay).
 - Verificado: iteration_8 100% frontend (fatura, wake-prompt, privacy overlay, regressao share+reconnect). Windows/Electron nativo NAO testavel no ambiente -> requer rebuild .exe.
+
+## 2026-09-24 — Ecra preto: robustez Electron + diagnostico visivel
+- Electron setPrivacy: mostra janela imediatamente (show:true + showInactive), setVisibleOnAllWorkspaces, destroy no off; mantem setContentProtection(true)+setIgnoreMouseEvents(true).
+- Cliente: novo indicador visivel (data-testid=cmd-flash) mostra cada comando recebido (Toque/Arrasto/Texto/Tecla/Ecra preto) 2.6s -> permite diagnosticar em hardware real se a mensagem chega ao dispositivo.
+- LIMITACAO confirmada ao user: no NAVEGADOR o split (cliente preto / tecnico normal) e impossivel (a captura inclui o overlay); so a app NATIVA (Windows content-protection / Android) consegue. Android nativo ainda por implementar.
