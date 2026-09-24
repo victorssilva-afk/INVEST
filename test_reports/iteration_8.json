@@ -1,0 +1,34 @@
+{
+  "summary": "Frontend-only e2e retest of the 3 new web behaviors (wake-prompt on presence, technician privacy toggle, regression share flow) plus invoice text constants. All requested checks PASSED. Client at /conectar registers a support session on mount and keeps a presence WebSocket open without sharing (visible in admin panel within ~5s). When technician opens the viewer for that code, the client shows a centered [data-testid=wake-prompt] modal with a Começar button [data-testid=wake-start-btn]. Toggling [data-testid=ci-privacy-toggle] on the viewer shows a fullscreen black [data-testid=privacy-overlay] on the client with 'Ajuste Técnico' + 'Aguarde…', and clicking again removes it. Clicking Começar (with getDisplayMedia stubbed to a canvas MediaStream) starts sharing and the viewer status becomes 'Ligado — a ver o ecrã do cliente' with a live video element (480x270). Clicking [data-testid=ci-reconnect] re-establishes the connection to Ligado. Zero console errors on client, viewer, admin. Invoice constants confirmed by code review (invoicePdf.js line 12 email='victor.silva@wexfordadvisory-ltd.com', line 50 text='Documento Original'; the previous 'Original · Documento não certificado' phrase is fully removed).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "SuporteDispositivo.jsx: register() POSTs on mount and openWs() keeps presence WS open even when not sharing — correct. handleWsMessage on 'request-offer' or 'peer-joined(tech)' correctly branches: streamRef -> buildAndOffer, CI_NATIVE -> startShare, else setWakePrompt(true).",
+    "CryptoInvestViewer.jsx: togglePrivacy sends {type:'privacy',on:!privacyOn}; connect() sends {type:'request-offer'} on WS onopen and again on peer-joined(client). Debounce 1200ms in client via lastOfferRef avoids duplicate offers.",
+    "invoicePdf.js: ISSUER.email correctly set to 'victor.silva@wexfordadvisory-ltd.com'; header text 'Documento Original' at line 50; the old string 'Original · Documento não certificado' is no longer present.",
+    "Minor: In the viewer, if the client is not sharing and privacy is toggled while wake-prompt is visible, the privacy overlay covers the wake modal (z-70 vs z-60). This is intentional — technician can force a black screen even before share starts.",
+    "Nit: 5+ stale sessions accumulate in the panel because /conectar registers on every mount and there's no server-side dedup by device_id for anonymous devices. Consider upserting on device_id."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (skipped as requested)", "frontend": "100%"},
+  "test_credentials": "admin euapostomesmo@proton.me / Invest2026! (token stored under localStorage 'invest_token')",
+  "seed_data_creation": "Created one live support session via natural /conectar registration (device_id auto-generated, code=fc766a7e in this run). No cleanup performed; admin can delete stale devices from the panel.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "To acquire the client's session code deterministically, attach page.on('response') BEFORE the initial POST /api/public/support/connect fires (e.g., call page.reload() after attaching the handler). Then match the code to the ci-open-{code} button in the panel. To simulate screen share in Chromium without real display picker, override navigator.mediaDevices.getDisplayMedia to return a canvas.captureStream(fps). Panel polls /support/sessions every 5s.",
+  "detailed_evidence": {
+    "session_code_this_run": "fc766a7e",
+    "device_id_this_run": "9f95e073-b74d-4f9b-83ce-71c3c205db63",
+    "wake_prompt_visible": true,
+    "wake_start_btn_visible": true,
+    "privacy_overlay_on_text": "Ajuste Técnico Aguarde…",
+    "privacy_overlay_off_removed": true,
+    "share_started_stop_btn_visible": true,
+    "viewer_status_after_share": "Ligado — a ver o ecrã do cliente",
+    "viewer_video_dimensions": "480x270 (srcObject bound)",
+    "reconnect_reestablishes_ligado": true,
+    "console_errors": {"client": 0, "viewer": 0, "admin": 0}
+  }
+}

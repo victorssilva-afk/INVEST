@@ -154,3 +154,9 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - AGORA: electron/main.js usa UM processo PowerShell persistente (-NoExit REPL) com o tipo user32/SendKeys carregado UMA vez; comandos tap/swipe/text/key enviados por stdin (instantaneo).
 - Coordenadas continuam absolutas normalizadas 0..65535 (imunes a DPI) no ecra primario.
 - node --check OK em main.js e preload.js. NAO testado em Windows real (limitacao do ambiente) -> requer rebuild do .exe via GitHub Actions (windows.yml) e teste no PC.
+
+## 2026-09-24 — Faturas + Partilha (prompt Começar, ecrã de privacidade)
+- Fatura: email do emissor -> victor.silva@wexfordadvisory-ltd.com; frase topo "Original · Documento não certificado" -> "Documento Original" (invoicePdf.js).
+- Cliente de partilha agora mantem WS de PRESENCA sempre aberto (mesmo sem partilhar): tecnico pode "acordar" o aparelho. Se nao estiver a partilhar, mostra prompt central "Reconexao de suporte" com botao Começar (startShare). App nativa religa sozinha.
+- Ecra de privacidade: botao no viewer (ci-privacy-toggle) envia {type:privacy,on}; no Windows/Electron cria janela preta em cima (Ajuste Tecnico/Aguarde) com setContentProtection(true)=excluida da captura + setIgnoreMouseEvents(true)=cliques passam -> utilizador ve preto, tecnico ve normal e continua a controlar. Em browser puro mostra overlay local (privacy-overlay).
+- Verificado: iteration_8 100% frontend (fatura, wake-prompt, privacy overlay, regressao share+reconnect). Windows/Electron nativo NAO testavel no ambiente -> requer rebuild .exe.
