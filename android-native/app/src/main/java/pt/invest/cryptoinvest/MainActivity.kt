@@ -39,7 +39,14 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
             return
         }
-        // 2) Pedir permissao de captura de ecra
+        // 2) Garantir permissao de sobreposicao (necessaria para o "ecra preto" de ajuste tecnico)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+            status.text = "Permita \"Sobrepor a outras apps\" para o ajuste técnico (ecrã preto)."
+            Toast.makeText(this, "Ative \"Sobrepor a outras apps\" para o Crypto.Invest", Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
+            return
+        }
+        // 3) Pedir permissao de captura de ecra
         status.text = "A pedir permissao de partilha de ecra..."
         startActivityForResult(projectionManager.createScreenCaptureIntent(), REQ_MEDIA_PROJECTION)
     }

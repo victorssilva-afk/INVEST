@@ -165,3 +165,11 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Electron setPrivacy: mostra janela imediatamente (show:true + showInactive), setVisibleOnAllWorkspaces, destroy no off; mantem setContentProtection(true)+setIgnoreMouseEvents(true).
 - Cliente: novo indicador visivel (data-testid=cmd-flash) mostra cada comando recebido (Toque/Arrasto/Texto/Tecla/Ecra preto) 2.6s -> permite diagnosticar em hardware real se a mensagem chega ao dispositivo.
 - LIMITACAO confirmada ao user: no NAVEGADOR o split (cliente preto / tecnico normal) e impossivel (a captura inclui o overlay); so a app NATIVA (Windows content-protection / Android) consegue. Android nativo ainda por implementar.
+
+## 2026-09-25 — Android nativo: ecra preto + reconexao + notificacao
+- ScreenShareService.handleMessage agora trata "request-offer" -> makeOffer (reconexao automatica quando o tecnico clica Reconectar; antes so tratava peer-joined) e "privacy" -> setPrivacy.
+- setPrivacy(on): overlay TYPE_APPLICATION_OVERLAY preto com "Ajuste Tecnico / Aguarde..." (FLAG_NOT_FOCUSABLE|FLAG_NOT_TOUCHABLE -> gestos de Acessibilidade continuam a passar para as apps).
+- postReconnectNotification(): notificacao HIGH/CATEGORY_CALL "Reconexao de suporte" com acao Reconectar (abre a app) ao chegar pedido do tecnico.
+- MainActivity: pede permissao "Sobrepor a outras apps" (ACTION_MANAGE_OVERLAY_PERMISSION) antes da captura, para o ecra preto funcionar.
+- LIMITACAO Android: MediaProjection captura o overlay -> o TECNICO tambem ve o preto+texto (ao contrario do Windows que usa content-protection). Split real com texto nao e possivel em Android standard. Alternativa: baixar brilho a 0 (user ve preto, tecnico ve real) mas sem texto.
+- NAO compilado/testado no ambiente (sem kotlinc/aapt2 arm64) -> requer build no GitHub Actions + teste em aparelho real.

