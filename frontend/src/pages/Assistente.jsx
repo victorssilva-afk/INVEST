@@ -5,7 +5,7 @@ import { jsPDF } from "jspdf";
 import { toast } from "sonner";
 import {
   Sparkles, Plus, Send, Image as ImageIcon, FileText, Trash2,
-  Loader2, Download, Printer, MessageSquare, Wand2,
+  Loader2, Download, Printer, MessageSquare, Wand2, Paperclip, X,
 } from "lucide-react";
 
 const CHAT_MODELS = [
@@ -59,7 +59,20 @@ function ChatTab() {
   const [model, setModel] = useState("gpt-5.4");
   const [busy, setBusy] = useState(false);
   const [imgMode, setImgMode] = useState(false);
+  const [refs, setRefs] = useState([]);
+  const fileRef = useRef(null);
   const endRef = useRef(null);
+
+  const onFiles = (e) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach((f) => {
+      if (!f.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = () => setRefs((r) => [...r, reader.result].slice(0, 8));
+      reader.readAsDataURL(f);
+    });
+    e.target.value = "";
+  };
 
   const loadSessions = () => api.get("/ai/sessions").then((r) => setSessions(r.data)).catch(() => {});
   useEffect(() => { loadSessions(); }, []);
@@ -93,14 +106,16 @@ function ChatTab() {
 
   const send = async () => {
     const text = input.trim();
-    if (!text || busy) return;
+    if ((!text && refs.length === 0) || busy) return;
     setInput(""); setBusy(true);
     const sid = await ensureSession();
-    setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", kind: "text", content: text }]);
+    const sentRefs = refs;
+    setMessages((m) => [...m, { id: `tmp-${Date.now()}`, role: "user", kind: "text", content: text || (imgMode ? "(imagens de referência)" : "") }]);
     try {
       if (imgMode) {
-        const r = await api.post("/ai/image", { prompt: text, session_id: sid });
+        const r = await api.post("/ai/image", { prompt: text || "Ajusta/combina as imagens fornecidas.", session_id: sid, images: sentRefs });
         setMessages((m) => [...m, r.data.message]);
+        setRefs([]);
       } else {
         const r = await api.post("/ai/chat", { session_id: sid, message: text, model });
         setMessages((m) => [...m, r.data.message]);
@@ -167,13 +182,33 @@ function ChatTab() {
               className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold ${imgMode ? "bg-[#D4AF37] text-[#0B1A30]" : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
               <ImageIcon size={14} /> {imgMode ? "Modo imagem ON" : "Gerar imagem"}
             </button>
+            {imgMode && (
+              <button onClick={() => fileRef.current?.click()} data-testid="attach-image-btn"
+                className="flex items-center gap-1.5 rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-200">
+                <Paperclip size={14} /> Anexar imagens
+              </button>
+            )}
+            <input ref={fileRef} type="file" accept="image/*" multiple hidden onChange={onFiles} data-testid="ref-file-input" />
           </div>
+          {imgMode && refs.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-2" data-testid="ref-images">
+              {refs.map((src, i) => (
+                <div key={i} className="relative">
+                  <img src={src} alt="referência" className="h-16 w-16 rounded-lg border border-slate-200 object-cover" />
+                  <button onClick={() => setRefs((r) => r.filter((_, j) => j !== i))} data-testid={`remove-ref-${i}`}
+                    className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-red-500 text-white hover:bg-red-600">
+                    <X size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex items-end gap-2">
             <textarea value={input} onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-              rows={2} data-testid="chat-input" placeholder={imgMode ? "Descreva a imagem a gerar…" : "Escreva a sua mensagem…"}
+              rows={2} data-testid="chat-input" placeholder={imgMode ? "Descreva a imagem ou o ajuste (anexe imagens de referência)…" : "Escreva a sua mensagem…"}
               className="flex-1 resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#D4AF37] focus:outline-none" />
-            <button onClick={send} disabled={busy || !input.trim()} data-testid="send-btn"
+            <button onClick={send} disabled={busy || (!input.trim() && !(imgMode && refs.length))} data-testid="send-btn"
               className="grid h-10 w-10 place-items-center rounded-lg bg-[#0B1A30] text-white hover:bg-[#152a4a] disabled:opacity-50">
               {busy ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
             </button>

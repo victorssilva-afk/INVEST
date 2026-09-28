@@ -8,11 +8,11 @@ import os
 import json
 import uuid
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import Depends, HTTPException
 from pydantic import BaseModel
-from emergentintegrations.llm.chat import LlmChat, UserMessage
+from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
 
@@ -42,6 +42,7 @@ class ChatIn(BaseModel):
 class ImageIn(BaseModel):
     prompt: str
     session_id: Optional[str] = None
+    images: Optional[List[str]] = None
 
 
 class PdfIn(BaseModel):
@@ -131,8 +132,14 @@ def register_ai_routes(api, db, get_current_user):
             raise HTTPException(500, "Chave de IA não configurada")
         try:
             llm = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=body.session_id or str(uuid.uuid4()),
-                          system_message="És um gerador de imagens profissional.").with_model(*IMAGE_MODEL).with_params(modalities=["image", "text"])
-            _text, images = await llm.send_message_multimodal_response(UserMessage(text=body.prompt))
+                          system_message="És um gerador e editor de imagens profissional.").with_model(*IMAGE_MODEL).with_params(modalities=["image", "text"])
+            file_contents = []
+            for im in (body.images or [])[:8]:
+                b64 = im.split(",", 1)[1] if isinstance(im, str) and im.startswith("data:") else im
+                if b64:
+                    file_contents.append(ImageContent(image_base64=b64))
+            um = UserMessage(text=body.prompt, file_contents=file_contents or None)
+            _text, images = await llm.send_message_multimodal_response(um)
         except Exception as e:
             raise HTTPException(502, f"Falha ao gerar imagem: {e}")
         if not images:

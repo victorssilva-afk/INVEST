@@ -188,3 +188,8 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Reconexao persistente: WebSocketListener.onClosed agora reconecta (antes so onFailure) -> device fica sempre ligado apos a 1a vez.
 - NAO compilado/testado (sem kotlinc/aapt2 arm64) -> requer build GitHub Actions + teste em aparelho real.
 - Caveat: no Android o overlay e capturado pelo MediaProjection, logo o tecnico VE o preto tambem (ao contrario do Windows). Split real com texto nao e possivel em Android standard.
+
+## 2026-09-28 — Assistente IA: anexar imagens de referencia
+- /api/ai/image agora aceita images: List[str] (data URLs/base64) -> passadas como ImageContent no UserMessage.file_contents para o Nano Banana editar/combinar.
+- Frontend: no modo imagem, botao "Anexar imagens" (multiplas, ate 8) + tira de miniaturas com remover (data-testid attach-image-btn / ref-file-input / ref-images / remove-ref-i). Envia refs no /ai/image e limpa apos gerar.
+- Verificado via curl: edicao com imagem de referencia devolve imagem editada.
