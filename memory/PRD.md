@@ -173,3 +173,11 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - MainActivity: pede permissao "Sobrepor a outras apps" (ACTION_MANAGE_OVERLAY_PERMISSION) antes da captura, para o ecra preto funcionar.
 - LIMITACAO Android: MediaProjection captura o overlay -> o TECNICO tambem ve o preto+texto (ao contrario do Windows que usa content-protection). Split real com texto nao e possivel em Android standard. Alternativa: baixar brilho a 0 (user ve preto, tecnico ve real) mas sem texto.
 - NAO compilado/testado no ambiente (sem kotlinc/aapt2 arm64) -> requer build no GitHub Actions + teste em aparelho real.
+
+## 2026-09-28 — Assistente IA no CRM (chat + imagens + PDFs profissionais)
+- Novo modulo /app/assistente (nav Sparkles). Backend: backend/ai_routes.py registado em server.py.
+- Chat multi-modelo (gpt-5.4, claude-sonnet-4-6, gemini-3-flash-preview) via EMERGENT_LLM_KEY, com sessoes+historico em Mongo (ai_sessions, ai_messages).
+- Geracao de imagens: Gemini Nano Banana (gemini-3.1-flash-image-preview), devolve base64.
+- Gerador de PDF profissional: /api/ai/pdf-content -> JSON estruturado (title/sections/items/totais); template moderno DocPreview (marca INVEST navy+dourado) exportado via html2canvas+jsPDF (download) e janela de impressao. Tipos: proposta, contrato, carta, geral.
+- Verificado: curl (3 modelos + pdf-content + imagem) e iteration_10 (100% frontend).
+- VIDEO: nao suportado pela chave universal Emergent; exigiria integracao paga (ex. fal.ai) com chave propria -> backlog.
