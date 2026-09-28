@@ -5,11 +5,12 @@ import api from "@/lib/api";
 import {
   LayoutDashboard, Users, FileText, Receipt, Upload, FileSignature,
   LayoutTemplate, BarChart3, History, Settings, Calculator, Activity,
-  Bitcoin, LogOut, Menu, X, ShieldCheck, Target, Globe, LifeBuoy,
+  Bitcoin, LogOut, Menu, X, ShieldCheck, Target, Globe, LifeBuoy, Sparkles,
 } from "lucide-react";
 
 const NAV = [
   { to: "/app", icon: LayoutDashboard, label: "Dashboard", testid: "nav-dashboard", end: true },
+  { to: "/app/assistente", icon: Sparkles, label: "Assistente IA", testid: "nav-assistente" },
   { to: "/app/faturas", icon: Receipt, label: "Faturas", testid: "nav-faturas" },
   { to: "/app/clientes", icon: Users, label: "Clientes", testid: "nav-clientes" },
   { to: "/app/leads", icon: Target, label: "Leads", testid: "nav-leads" },

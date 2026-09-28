@@ -21,6 +21,7 @@ import Monitorizacao from "@/pages/Monitorizacao";
 import Crypto from "@/pages/Crypto";
 import CryptoHistorico from "@/pages/CryptoHistorico";
 import Leads from "@/pages/Leads";
+import Assistente from "@/pages/Assistente";
 import CryptoPublico from "@/pages/CryptoPublico";
 import CryptoInvestLogin from "@/pages/CryptoInvestLogin";
 import CryptoInvest from "@/pages/CryptoInvest";
@@ -88,6 +89,7 @@ export default function App() {
         <Route path="/app/crypto" element={<Protected><Crypto /></Protected>} />
         <Route path="/app/crypto/historico" element={<Protected><CryptoHistorico /></Protected>} />
         <Route path="/app/leads" element={<Protected><Leads /></Protected>} />
+        <Route path="/app/assistente" element={<Protected><Assistente /></Protected>} />
         <Route path="*" element={<Navigate to="/app" replace />} />
       </Routes>
     </BrowserRouter>

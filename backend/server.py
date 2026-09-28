@@ -1725,6 +1725,9 @@ async def ws_support(ws: WebSocket, code: str):
             support_rooms.pop(code, None)
 
 
+from ai_routes import register_ai_routes
+register_ai_routes(api, db, get_current_user)
+
 app.include_router(api)
 app.add_middleware(
     CORSMiddleware,
