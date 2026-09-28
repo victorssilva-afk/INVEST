@@ -55,6 +55,7 @@ class ScreenShareService : Service() {
     private var closed = false
     private var overlayView: View? = null
     private val main = Handler(Looper.getMainLooper())
+    private var lastOffer = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -196,6 +197,9 @@ class ScreenShareService : Service() {
         val req = Request.Builder().url(wsUrl).build()
         ws = http.newWebSocket(req, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) { handleMessage(text) }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                if (!closed) { try { Thread.sleep(1500) } catch (e: Exception) {}; connectSignaling() }
+            }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
                 if (!closed) { try { Thread.sleep(2000) } catch (e: Exception) {}; connectSignaling() }
             }
@@ -232,6 +236,11 @@ class ScreenShareService : Service() {
     }
 
     private fun makeOffer() {
+        // Debounce: o tecnico dispara peer-joined E request-offer; sem isto sao criadas 2 offers
+        // em simultaneo e a negociacao falha (ecra preto no tecnico).
+        val now = System.currentTimeMillis()
+        if (now - lastOffer < 1500L) return
+        lastOffer = now
         pc?.createOffer(object : SimpleSdpObserver() {
             override fun onCreateSuccess(desc: SessionDescription) {
                 pc?.setLocalDescription(SimpleSdpObserver(), desc)
@@ -258,7 +267,7 @@ class ScreenShareService : Service() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
                     Log.w(TAG, "sem permissao de sobreposicao"); return@post
                 }
-                val root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK) }
+                val root = FrameLayout(this).apply { setBackgroundColor(0xFF000000.toInt()); alpha = 1f }
                 val tv = TextView(this).apply {
                     text = "Ajuste Técnico\nAguarde…"
                     setTextColor(Color.parseColor("#EEEEEE"))
@@ -278,9 +287,12 @@ class ScreenShareService : Service() {
                     WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                         WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                        WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                     PixelFormat.OPAQUE
                 )
+                lp.dimAmount = 0f
+                lp.gravity = Gravity.TOP or Gravity.START
+                lp.x = 0; lp.y = 0
                 try { wm.addView(root, lp); overlayView = root } catch (e: Exception) { Log.w(TAG, "overlay add fail", e) }
             } else {
                 try { overlayView?.let { wm.removeView(it) } } catch (e: Exception) {}

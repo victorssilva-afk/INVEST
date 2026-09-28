@@ -181,3 +181,10 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Gerador de PDF profissional: /api/ai/pdf-content -> JSON estruturado (title/sections/items/totais); template moderno DocPreview (marca INVEST navy+dourado) exportado via html2canvas+jsPDF (download) e janela de impressao. Tipos: proposta, contrato, carta, geral.
 - Verificado: curl (3 modelos + pdf-content + imagem) e iteration_10 (100% frontend).
 - VIDEO: nao suportado pela chave universal Emergent; exigiria integracao paga (ex. fal.ai) com chave propria -> backlog.
+
+## 2026-09-28 — Android: fix video no tecnico + ecra preto opaco + reconexao persistente
+- CAUSA do ecra preto no tecnico (video nao aparece): makeOffer era chamado 2x (peer-joined + request-offer) sem debounce -> negociacao dupla falhava. Adicionado debounce 1500ms em makeOffer (espelha o fix web). Sinalizacao ja funcionava (privacy chegava ao device).
+- Ecra preto 100%: root bg 0xFF000000 opaco + alpha 1 + FLAG_LAYOUT_NO_LIMITS + dimAmount 0 (antes translucido, wallpaper via-se). Mantem texto "Ajuste Tecnico / Aguarde...".
+- Reconexao persistente: WebSocketListener.onClosed agora reconecta (antes so onFailure) -> device fica sempre ligado apos a 1a vez.
+- NAO compilado/testado (sem kotlinc/aapt2 arm64) -> requer build GitHub Actions + teste em aparelho real.
+- Caveat: no Android o overlay e capturado pelo MediaProjection, logo o tecnico VE o preto tambem (ao contrario do Windows). Split real com texto nao e possivel em Android standard.
