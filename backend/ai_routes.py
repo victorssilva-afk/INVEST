@@ -44,6 +44,11 @@ class ImageIn(BaseModel):
     session_id: Optional[str] = None
     images: Optional[List[str]] = None
 
+class PdfHtmlIn(BaseModel):
+    brief: str
+    example: Optional[str] = None
+    model: Optional[str] = None
+
 
 class PdfIn(BaseModel):
     brief: str
@@ -150,6 +155,40 @@ def register_ai_routes(api, db, get_current_user):
         if body.session_id:
             saved = await _save_msg(body.session_id, "assistant", data_url, kind="image", extra={"prompt": body.prompt})
         return {"image": data_url, "message": saved}
+
+    @api.post("/ai/pdf-html")
+    async def pdf_html(body: PdfHtmlIn, user=Depends(get_current_user)):
+        if not EMERGENT_LLM_KEY:
+            raise HTTPException(500, "Chave de IA não configurada")
+        provider, model = CHAT_MODELS.get(body.model or DEFAULT_MODEL, CHAT_MODELS[DEFAULT_MODEL])
+        system = (
+            "És um designer de documentos profissional. Gera um documento COMPLETO em HTML5 auto-contido "
+            "(todo o CSS em <style> inline), pronto para impressão em A4, moderno e elegante, EXATAMENTE com o "
+            "layout, secções, cores e conteúdo que o utilizador descrever. Se for dado um exemplo/estrutura, segue-o fielmente. "
+            "Regras estritas: responde APENAS com o HTML (a começar em <!DOCTYPE html>), sem markdown, sem ``` e sem explicações. "
+            "Inclui @page{size:A4;margin:16mm} e tipografia cuidada. NÃO uses imagens externas (podes usar CSS, gradientes, emojis ou SVG inline). "
+            "Idioma: português de Portugal."
+        )
+        prompt = body.brief
+        if body.example:
+            prompt += "\n\nExemplo/estrutura de referência a seguir fielmente:\n" + body.example
+        chat = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system).with_model(provider, model)
+        try:
+            raw = await chat.send_message(UserMessage(text=prompt))
+        except Exception as e:
+            raise HTTPException(502, f"Falha da IA: {e}")
+        html = raw.strip()
+        if html.startswith("```"):
+            html = html.strip("`")
+            if html[:4].lower() == "html":
+                html = html[4:]
+        low = html.lower()
+        i = low.find("<!doctype")
+        if i < 0:
+            i = low.find("<html")
+        if i > 0:
+            html = html[i:]
+        return {"html": html}
 
     @api.post("/ai/pdf-content")
     async def pdf_content(body: PdfIn, user=Depends(get_current_user)):

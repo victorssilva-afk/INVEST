@@ -221,27 +221,41 @@ function ChatTab() {
 
 /* ---------------- PDF ---------------- */
 function PdfTab() {
+  const [mode, setMode] = useState("estruturado");
   const [docType, setDocType] = useState("proposta");
   const [model, setModel] = useState("gpt-5.4");
   const [brief, setBrief] = useState("");
+  const [example, setExample] = useState("");
   const [busy, setBusy] = useState(false);
   const [doc, setDoc] = useState(null);
+  const [html, setHtml] = useState("");
   const previewRef = useRef(null);
+  const iframeRef = useRef(null);
 
   const generate = async () => {
     if (!brief.trim() || busy) return;
     setBusy(true);
     try {
-      const r = await api.post("/ai/pdf-content", { brief: brief.trim(), doc_type: docType, model });
-      setDoc(r.data.content);
-      toast.success("Documento gerado. Reveja e exporte em PDF.");
+      if (mode === "personalizado") {
+        const r = await api.post("/ai/pdf-html", { brief: brief.trim(), example: example.trim() || undefined, model });
+        setHtml(r.data.html); setDoc(null);
+        toast.success("Documento gerado. Reveja e exporte em PDF.");
+      } else {
+        const r = await api.post("/ai/pdf-content", { brief: brief.trim(), doc_type: docType, model });
+        setDoc(r.data.content); setHtml("");
+        toast.success("Documento gerado. Reveja e exporte em PDF.");
+      }
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Falha ao gerar o documento");
     } finally { setBusy(false); }
   };
 
+  const captureNode = () => mode === "personalizado"
+    ? (iframeRef.current?.contentDocument?.body || null)
+    : previewRef.current;
+
   const downloadPdf = async () => {
-    const node = previewRef.current;
+    const node = captureNode();
     if (!node) return;
     toast.message("A preparar PDF…");
     const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
@@ -258,26 +272,41 @@ function PdfTab() {
   };
 
   const printPdf = () => {
-    const node = previewRef.current;
-    if (!node) return;
     const w = window.open("", "_blank");
-    w.document.write(`<html><head><title>${doc?.title || "Documento"}</title>
-      <style>@page{margin:0}body{margin:0}</style></head><body>${node.outerHTML}</body></html>`);
+    if (!w) return;
+    if (mode === "personalizado") {
+      w.document.write(html);
+    } else {
+      const node = previewRef.current;
+      if (!node) { w.close(); return; }
+      w.document.write(`<html><head><title>${doc?.title || "Documento"}</title><style>@page{margin:0}body{margin:0}</style></head><body>${node.outerHTML}</body></html>`);
+    }
     w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 400);
+    setTimeout(() => { w.focus(); w.print(); }, 500);
   };
+
+  const hasOutput = mode === "personalizado" ? !!html : !!doc;
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr]">
-      {/* Form */}
       <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4">
-        <div>
-          <label className="mb-1 block text-xs font-bold text-slate-500">Tipo de documento</label>
-          <select value={docType} onChange={(e) => setDocType(e.target.value)} data-testid="doc-type-select"
-            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
-            {DOC_TYPES.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
-          </select>
+        <div className="flex rounded-lg bg-slate-100 p-1" data-testid="pdf-mode-toggle">
+          <button onClick={() => setMode("estruturado")} data-testid="mode-estruturado"
+            className={`flex-1 rounded-md py-1.5 text-xs font-bold ${mode === "estruturado" ? "bg-white text-[#0B1A30] shadow" : "text-slate-500"}`}>Estruturado</button>
+          <button onClick={() => setMode("personalizado")} data-testid="mode-personalizado"
+            className={`flex-1 rounded-md py-1.5 text-xs font-bold ${mode === "personalizado" ? "bg-white text-[#0B1A30] shadow" : "text-slate-500"}`}>Personalizado (livre)</button>
         </div>
+
+        {mode === "estruturado" && (
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-500">Tipo de documento</label>
+            <select value={docType} onChange={(e) => setDocType(e.target.value)} data-testid="doc-type-select"
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+              {DOC_TYPES.map((d) => <option key={d.id} value={d.id}>{d.label}</option>)}
+            </select>
+          </div>
+        )}
+
         <div>
           <label className="mb-1 block text-xs font-bold text-slate-500">Modelo de IA</label>
           <select value={model} onChange={(e) => setModel(e.target.value)} data-testid="pdf-model-select"
@@ -285,17 +314,32 @@ function PdfTab() {
             {CHAT_MODELS.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
           </select>
         </div>
+
         <div>
-          <label className="mb-1 block text-xs font-bold text-slate-500">Descreva o que precisa</label>
-          <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={7} data-testid="pdf-brief"
-            placeholder="Ex.: Proposta para o cliente João Silva de serviços de consultoria financeira: análise de carteira (500€), relatório mensal (200€/mês), reunião trimestral. Prazo 12 meses."
+          <label className="mb-1 block text-xs font-bold text-slate-500">
+            {mode === "personalizado" ? "Descreva TODO o PDF: layout, secções, cores, conteúdo…" : "Descreva o que precisa"}
+          </label>
+          <textarea value={brief} onChange={(e) => setBrief(e.target.value)} rows={mode === "personalizado" ? 6 : 7} data-testid="pdf-brief"
+            placeholder={mode === "personalizado"
+              ? "Ex.: Um contrato de prestação de serviços com capa azul-marinho e título dourado centrado, cláusulas numeradas, uma tabela de honorários, rodapé com NIF e assinatura de ambas as partes…"
+              : "Ex.: Proposta para o cliente João Silva de consultoria financeira: análise de carteira (500€), relatório mensal (200€/mês). Prazo 12 meses."}
             className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#D4AF37] focus:outline-none" />
         </div>
+
+        {mode === "personalizado" && (
+          <div>
+            <label className="mb-1 block text-xs font-bold text-slate-500">Exemplo / estrutura a seguir (opcional)</label>
+            <textarea value={example} onChange={(e) => setExample(e.target.value)} rows={4} data-testid="pdf-example"
+              placeholder="Cole aqui um exemplo de texto/estrutura, ou deixe em branco."
+              className="w-full resize-none rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-[#D4AF37] focus:outline-none" />
+          </div>
+        )}
+
         <button onClick={generate} disabled={busy || !brief.trim()} data-testid="generate-pdf-btn"
           className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#0B1A30] py-3 text-sm font-bold text-white hover:bg-[#152a4a] disabled:opacity-50">
           {busy ? <Loader2 size={18} className="animate-spin" /> : <Wand2 size={18} />} Gerar documento
         </button>
-        {doc && (
+        {hasOutput && (
           <div className="flex gap-2 pt-1">
             <button onClick={downloadPdf} data-testid="download-pdf-btn" className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-[#D4AF37] py-2.5 text-sm font-bold text-[#0B1A30] hover:brightness-105"><Download size={16} /> PDF</button>
             <button onClick={printPdf} data-testid="print-pdf-btn" className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-slate-300 py-2.5 text-sm font-bold text-slate-700 hover:bg-slate-100"><Printer size={16} /> Imprimir</button>
@@ -303,9 +347,11 @@ function PdfTab() {
         )}
       </div>
 
-      {/* Preview */}
       <div className="overflow-auto rounded-xl border border-slate-200 bg-slate-100 p-4">
-        {doc ? <DocPreview ref={previewRef} doc={doc} /> : (
+        {mode === "personalizado" && html ? (
+          <iframe ref={iframeRef} title="preview" srcDoc={html} data-testid="pdf-iframe"
+            className="h-[70vh] w-full rounded-lg border border-slate-200 bg-white" />
+        ) : doc ? <DocPreview ref={previewRef} doc={doc} /> : (
           <div className="grid h-full min-h-[50vh] place-items-center text-center text-slate-400">
             <div><FileText className="mx-auto mb-3" size={34} /><p className="text-sm">O documento gerado aparecerá aqui com design profissional.</p></div>
           </div>

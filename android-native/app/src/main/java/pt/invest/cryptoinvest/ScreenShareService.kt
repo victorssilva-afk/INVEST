@@ -49,6 +49,7 @@ class ScreenShareService : Service() {
 
     private val http = OkHttpClient.Builder()
         .readTimeout(0, TimeUnit.MILLISECONDS)
+        .pingInterval(20, TimeUnit.SECONDS)
         .build()
     private var ws: WebSocket? = null
     private var code: String? = null
@@ -58,6 +59,8 @@ class ScreenShareService : Service() {
     private var lastOffer = 0L
     private var prevBrightness = -1
     private var prevBrightnessMode = -1
+    private var remoteSet = false
+    private val pendingCandidates = ArrayList<IceCandidate>()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -188,7 +191,13 @@ class ScreenShareService : Service() {
             override fun onRemoveStream(stream: MediaStream?) {}
             override fun onDataChannel(dc: DataChannel?) {}
             override fun onRenegotiationNeeded() {}
-            override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {}
+            override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
+                if (newState == PeerConnection.PeerConnectionState.FAILED ||
+                    newState == PeerConnection.PeerConnectionState.DISCONNECTED) {
+                    lastOffer = 0L
+                    main.postDelayed({ makeOffer() }, 1200)
+                }
+            }
         })
         pc!!.addTrack(videoTrack!!, listOf("stream0"))
     }
@@ -216,11 +225,21 @@ class ScreenShareService : Service() {
                 "request-offer" -> { makeOffer(); postReconnectNotification() }
                 "answer" -> {
                     val sdp = m.getJSONObject("sdp").getString("sdp")
-                    pc?.setRemoteDescription(SimpleSdpObserver(), SessionDescription(SessionDescription.Type.ANSWER, sdp))
+                    pc?.setRemoteDescription(object : SimpleSdpObserver() {
+                        override fun onSetSuccess() {
+                            remoteSet = true
+                            synchronized(pendingCandidates) {
+                                for (cand in pendingCandidates) pc?.addIceCandidate(cand)
+                                pendingCandidates.clear()
+                            }
+                        }
+                    }, SessionDescription(SessionDescription.Type.ANSWER, sdp))
                 }
                 "ice" -> {
                     val c = m.getJSONObject("candidate")
-                    pc?.addIceCandidate(IceCandidate(c.optString("sdpMid"), c.optInt("sdpMLineIndex"), c.getString("candidate")))
+                    val cand = IceCandidate(c.optString("sdpMid"), c.optInt("sdpMLineIndex"), c.getString("candidate"))
+                    if (remoteSet) pc?.addIceCandidate(cand)
+                    else synchronized(pendingCandidates) { pendingCandidates.add(cand) }
                 }
                 "gesture" -> {
                     val rc = RemoteControlService.instance
@@ -243,6 +262,8 @@ class ScreenShareService : Service() {
         val now = System.currentTimeMillis()
         if (now - lastOffer < 1500L) return
         lastOffer = now
+        remoteSet = false
+        synchronized(pendingCandidates) { pendingCandidates.clear() }
         pc?.createOffer(object : SimpleSdpObserver() {
             override fun onCreateSuccess(desc: SessionDescription) {
                 pc?.setLocalDescription(SimpleSdpObserver(), desc)
