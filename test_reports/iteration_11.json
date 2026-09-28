@@ -1,0 +1,26 @@
+{
+  "summary": "Frontend-only test of the new Assistente 'Gerar PDF' custom mode. Logged in as admin, opened /app/assistente > tab Gerar PDF. Verified mode toggle (Estruturado default with doc-type-select; Personalizado shows pdf-brief + pdf-example, hides doc-type-select). Generated a custom contract in Personalizado mode - iframe (data-testid='pdf-iframe') rendered a full HTML document with 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS' and numbered clauses; download and print buttons appeared. Switched back to Estruturado, generated a proposta - DocPreview (data-testid='pdf-preview') rendered a styled proposal with INVEST header. No uncaught console/page errors observed.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Assistente > Gerar PDF > Estruturado preview", "issues": ["The DocPreview canvas (width 794px) slightly overflows/right-clips inside its container on ~1440px viewport (e.g. 'REPORTE ME…' truncated in header). Consider max-width:100% or horizontal scroll wrapper. Non-blocking."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "PdfTab.downloadPdf() for personalizado mode uses iframeRef.contentDocument.body via html2canvas - can fail for cross-origin fonts/CSS if the srcDoc HTML links to remote stylesheets; consider using window.print() on the iframe or a server-side renderer for higher fidelity.",
+    "generate() does not reset previous output when switching modes; if user generates structured then flips to personalizado without generating, hasOutput correctly hides buttons, OK. Minor: consider clearing brief/example when toggling mode to avoid confusion.",
+    "printPdf(): setTimeout 500ms before w.print() may be too short for large HTML with remote assets; consider w.onload."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "test_credentials": "ADMIN euapostomesmo@proton.me / Invest2026! (works)",
+  "seed_data_creation": "None. Note: each 'Gerar documento' call in personalizado mode calls /ai/pdf-html which does NOT persist to ai_sessions (only /ai/chat and /ai/image do). Structured /ai/pdf-content also does not create sessions. No cleanup needed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Both PDF modes fully functional end-to-end on desktop viewport. Android native changes were NOT tested (not applicable in this env). If retesting, note AI generation ~10-20s; timeouts of 60s used.",
+  "rca of the issue": "N/A - no issues found"
+}

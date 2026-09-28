@@ -201,3 +201,8 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - LIMITACAO IRREDUTIVEL Android: nao da para mostrar "aviso/texto" ao cliente sem o tecnico ver, nem preto 100% garantido em OLED (brilho baixo != pixel preto). Windows continua o unico com preto+texto+tecnico-normal (content-protection).
 - Video lento/stuck no tecnico: causado pela dupla-offer; corrigido antes com debounce em makeOffer.
 - NAO testado (sem kotlinc/aapt2) -> requer rebuild GitHub Actions + teste real.
+
+## 2026-09-28 — Android robustez (video/desconexao) + PDF personalizado
+- Android: OkHttp pingInterval 20s (evita desconexao por idle) + buffer de ICE (remoteSet/pendingCandidates, evita candidatos perdidos->video preto) + auto ICE-restart em onConnectionChange FAILED/DISCONNECTED (recupera sozinho). makeOffer limpa buffer e reseta remoteSet.
+- PDF: novo modo PERSONALIZADO (livre) -> /api/ai/pdf-html gera HTML completo auto-contido conforme o utilizador descreve o layout/estrutura (+ exemplo opcional). Preview em iframe; export por PDF (html2canvas+jsPDF) e Imprimir. Modo Estruturado mantido. Verificado backend via curl.
+- Android NAO testavel no ambiente -> requer rebuild GitHub Actions + teste real.
