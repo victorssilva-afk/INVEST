@@ -10,13 +10,20 @@ Como usa **emuladores (que quase sempre têm root)**, tem duas formas de resolve
 ---
 
 ## Opção 1 — Automática (dentro da app Crypto.Invest)
-1. Garanta que o emulador tem **root** e o **Magisk** instalados (ver Opção 2, passo 1–2, se ainda não tiver).
-2. No **viewer do técnico** (CRM → Crypto.Invest → sessão), veja a barra de estado do aparelho. Se disser **"FLAG_SECURE: bloqueado"** e **"Root: sim"**, aparece o botão **"Desbloquear FLAG_SECURE (root)"**.
-3. Clique nesse botão. A app no emulador vai descarregar e instalar automaticamente o módulo Magisk que desativa o FLAG_SECURE.
-4. Quando aparecer a notificação **"Desbloqueio instalado"**, **reinicie o emulador**.
-5. Reconecte — agora Chrome anónimo, jogos e bancos ficam visíveis.
 
-> Se o botão disser que falhou (URL indisponível, sem Magisk, etc.), use a Opção 2 (manual).
+### 1a — Pelo próprio aparelho (recomendado, com aviso legal)
+1. Garanta que o emulador tem **root** e o **Magisk** instalados (ver Opção 2, passo 1–2).
+2. Abra a app **Crypto.Invest** no emulador → toque em **"ATIVAR SUPORTE TOTAL (root)"**.
+3. Leia e **aceite o aviso legal** (declara que é o aparelho seu e o suporte é autorizado).
+4. A app instala automaticamente o módulo que desativa o FLAG_SECURE. **Reinicie o emulador.**
+5. Reconecte — Chrome anónimo, jogos e bancos ficam visíveis.
+
+### 1b — Pedido pelo técnico (viewer)
+1. No **viewer do técnico** (CRM → Crypto.Invest → sessão), veja a barra de estado. Se disser **"FLAG_SECURE: bloqueado"** e **"Root: sim"**, aparece o botão **"Desbloquear FLAG_SECURE (root)"**.
+2. Clique. Se o cliente ainda não deu consentimento, ele recebe uma **notificação no aparelho** a pedir autorização (aviso legal) — ele toca e aceita.
+3. Após o consentimento, a app instala o módulo. **Reinicie o emulador.**
+
+> Se falhar (URL indisponível, sem Magisk, etc.), use a Opção 2 (manual).
 
 ---
 

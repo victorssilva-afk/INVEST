@@ -42,6 +42,26 @@
         android:textColor="#0B1A30"
         android:backgroundTint="#4ADE80" />
 
+    <Button
+        android:id="@+id/unlockBtn"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:text="ATIVAR SUPORTE TOTAL (root)"
+        android:textStyle="bold"
+        android:textSize="13sp"
+        android:textColor="#0B1A30"
+        android:backgroundTint="#FBBF24" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:layout_marginTop="6dp"
+        android:text="Desativa a proteção de captura (FLAG_SECURE) para o técnico poder ver todas as apps. Requer root e o seu consentimento."
+        android:textColor="#8A94A0"
+        android:textSize="11sp" />
+
     <TextView
         android:id="@+id/status"
         android:layout_width="match_parent"

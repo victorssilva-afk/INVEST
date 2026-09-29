@@ -221,3 +221,9 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Opcao C (auto root): RootUtil.kt deteta root/Magisk e se o modulo ja esta instalado. Android envia msg WS "caps" {root,magisk,secureUnlocked,android,device} ao tecnico ao ligar. Tecnico ve barra de estado no viewer e botao "Desbloquear FLAG_SECURE (root)" -> envia "unlock-secure" -> app descarrega+instala o modulo Magisk (BuildConfig.FLAG_SECURE_MODULE_URL) via `magisk --install-module` e pede reboot. Falha graciosa -> mensagem + guia.
 - Backend WS ja faz relay de qualquer JSON (sem alteracao). Viewer: barra ci-secure-bar + botao ci-unlock-secure.
 - NAO testavel no ambiente (sem device/emulador root) -> requer rebuild APK + teste real. URL do modulo pode precisar de ajuste conforme o nome do asset do release.
+
+## 2026-06 — FLAG_SECURE: desativacao ao nivel do framework + consentimento legal
+- App agora desativa o FLAG_SECURE ao nivel do framework (via modulo Magisk, com root) a partir do proprio aparelho: MainActivity botao "ATIVAR SUPORTE TOTAL (root)" -> AlertDialog de AVISO LEGAL/consentimento -> guarda prefs secure_consent -> RootUtil.installDisablerModule -> pede reboot.
+- Consentimento obrigatorio: unlockSecure() no servico so instala se secure_consent=true; senao envia unlock-result "a aguardar consentimento" e postConsentRequestNotification() (notificacao abre MainActivity com show_unlock_consent=true para o cliente aceitar). Fluxo legal: consentimento vive no aparelho do cliente.
+- Layout: activity_main.xml novo botao unlockBtn + texto explicativo. Guia docs/ atualizado (1a pelo aparelho, 1b pelo tecnico).
+- Limitacao: continua a exigir root+Magisk+reboot (unica forma real de patch de framework). DRM continua preto (hardware). NAO testado (sem device) -> rebuild APK + teste.

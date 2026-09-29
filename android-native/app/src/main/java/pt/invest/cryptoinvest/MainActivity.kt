@@ -12,6 +12,7 @@ import android.text.TextUtils
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
@@ -19,6 +20,7 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var status: TextView
     private lateinit var connectBtn: Button
+    private lateinit var unlockBtn: Button
     private lateinit var projectionManager: MediaProjectionManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,9 +28,48 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         status = findViewById(R.id.status)
         connectBtn = findViewById(R.id.connectBtn)
+        unlockBtn = findViewById(R.id.unlockBtn)
         projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
 
         connectBtn.setOnClickListener { onConnect() }
+        unlockBtn.setOnClickListener { showSecureConsent() }
+
+        // Se veio da notificacao "abrir app para confirmar" (pedido do tecnico), mostra o consentimento.
+        if (intent?.getBooleanExtra("show_unlock_consent", false) == true) showSecureConsent()
+    }
+
+    // Aviso legal + consentimento antes de desativar o FLAG_SECURE ao nivel do framework.
+    private fun showSecureConsent() {
+        AlertDialog.Builder(this)
+            .setTitle("Desativar proteção de captura de ecrã")
+            .setMessage(
+                "Vai ativar o MODO SUPORTE TOTAL.\n\n" +
+                "Isto desativa a proteção FLAG_SECURE em TODO o sistema, com permissões de root. " +
+                "Passa a ser possível ver e partilhar apps normalmente protegidas (banca, separador anónimo, alguns jogos).\n\n" +
+                "⚠️ Só deve ativar em aparelhos SEUS e para suporte técnico AUTORIZADO por si. " +
+                "Ao continuar, declara que consente e que é o responsável pelo aparelho.\n\n" +
+                "É necessário reiniciar o aparelho depois de instalar."
+            )
+            .setPositiveButton("Aceito e desativar") { _, _ ->
+                getSharedPreferences("ci", Context.MODE_PRIVATE).edit().putBoolean("secure_consent", true).apply()
+                runFrameworkDisable()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    private fun runFrameworkDisable() {
+        status.text = "A ativar Suporte Total (root)… aguarde."
+        unlockBtn.isEnabled = false
+        Thread {
+            val (ok, msg) = RootUtil.installDisablerModule(this, BuildConfig.FLAG_SECURE_MODULE_URL)
+            runOnUiThread {
+                unlockBtn.isEnabled = true
+                status.text = if (ok) "✓ $msg" else "✗ $msg"
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
+                if (ok) unlockBtn.text = "SUPORTE TOTAL ATIVO — reinicie o aparelho"
+            }
+        }.start()
     }
 
     private fun onConnect() {
