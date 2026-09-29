@@ -206,3 +206,11 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Android: OkHttp pingInterval 20s (evita desconexao por idle) + buffer de ICE (remoteSet/pendingCandidates, evita candidatos perdidos->video preto) + auto ICE-restart em onConnectionChange FAILED/DISCONNECTED (recupera sozinho). makeOffer limpa buffer e reseta remoteSet.
 - PDF: novo modo PERSONALIZADO (livre) -> /api/ai/pdf-html gera HTML completo auto-contido conforme o utilizador descreve o layout/estrutura (+ exemplo opcional). Preview em iframe; export por PDF (html2canvas+jsPDF) e Imprimir. Modo Estruturado mantido. Verificado backend via curl.
 - Android NAO testavel no ambiente -> requer rebuild GitHub Actions + teste real.
+
+## 2026-06 — Android video preto em emuladores: forcar VP8 (fix)
+- CONTEXTO: utilizador testa em EMULADORES Android online (v9-v15), nao aparelho fisico. Sintoma: tecnico ve preto (nenhum video).
+- CAUSA provavel: emuladores x86 nao tem encoder H264/VP8 por HW fiavel; se a negociacao escolhe H264, o emulador falha a codificar -> preto.
+- FIX (ScreenShareService.kt): (1) DefaultVideoEncoderFactory(..., enableIntelVp8Encoder=false, ...) -> usa VP8 por SOFTWARE; (2) preferVp8() reordena a m=video do offer para VP8 primeiro -> browser do tecnico escolhe VP8 (sempre com SW decoder/encoder). Viewer nao forca codec, aceita VP8.
+- iOS: NAO implementado por decisao do utilizador (controlo remoto e impossivel no iOS nao-jailbroken; so daria visualizacao).
+- PRIVACIDADE em EMULADOR: impossivel (cliente preto + tecnico normal) — emulador nao tem brilho fisico; a imagem que o emulador mostra E a que e capturada. So funciona em telemovel REAL (brilho fisico a 0). Limitacao fisica, nao bug.
+- NAO testavel no ambiente (sem toolchain Android) -> requer rebuild GitHub Actions + teste no emulador/aparelho.

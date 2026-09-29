@@ -147,7 +147,10 @@ class ScreenShareService : Service() {
         PeerConnectionFactory.initialize(
             PeerConnectionFactory.InitializationOptions.builder(applicationContext).createInitializationOptions()
         )
-        val encoder = DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, false)
+        // Encoder: desligamos o VP8 por HARDWARE (instavel/ausente em emuladores x86, que muitas
+        // vezes anunciam suporte mas falham a codificar -> ecra preto no tecnico). Com
+        // enableIntelVp8Encoder=false usa-se o VP8 por SOFTWARE, fiavel em qualquer emulador (Android 9-15).
+        val encoder = DefaultVideoEncoderFactory(eglBase.eglBaseContext, false, false)
         val decoder = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
         factory = PeerConnectionFactory.builder()
             .setVideoEncoderFactory(encoder)
@@ -266,8 +269,11 @@ class ScreenShareService : Service() {
         synchronized(pendingCandidates) { pendingCandidates.clear() }
         pc?.createOffer(object : SimpleSdpObserver() {
             override fun onCreateSuccess(desc: SessionDescription) {
-                pc?.setLocalDescription(SimpleSdpObserver(), desc)
-                val sdp = JSONObject().put("type", "offer").put("sdp", desc.description)
+                // Forca VP8 no topo da lista de codecs. Assim o tecnico (browser) escolhe VP8, que
+                // tem sempre encoder por software -> evita o preto quando o H264 por HW falha no emulador.
+                val munged = SessionDescription(desc.type, preferVp8(desc.description))
+                pc?.setLocalDescription(SimpleSdpObserver(), munged)
+                val sdp = JSONObject().put("type", "offer").put("sdp", munged.description)
                 send(JSONObject().put("type", "offer").put("sdp", sdp))
             }
         }, MediaConstraints().apply {
@@ -278,6 +284,26 @@ class ScreenShareService : Service() {
     }
 
     private fun send(o: JSONObject) { try { ws?.send(o.toString()) } catch (e: Exception) {} }
+
+    // Reordena a m-line de video para colocar o payload VP8 em primeiro lugar.
+    private fun preferVp8(sdp: String): String {
+        val lines = sdp.split("\r\n").toMutableList()
+        val mIndex = lines.indexOfFirst { it.startsWith("m=video") }
+        if (mIndex < 0) return sdp
+        val rtpmap = Regex("^a=rtpmap:(\\d+) VP8/90000", RegexOption.IGNORE_CASE)
+        var vp8Pt: String? = null
+        for (l in lines) { val mt = rtpmap.find(l); if (mt != null) { vp8Pt = mt.groupValues[1]; break } }
+        if (vp8Pt == null) return sdp
+        val parts = lines[mIndex].split(" ").toMutableList()
+        if (parts.size <= 3) return sdp
+        val header = parts.subList(0, 3).toMutableList()
+        val pts = parts.subList(3, parts.size).toMutableList()
+        pts.remove(vp8Pt)
+        pts.add(0, vp8Pt)
+        header.addAll(pts)
+        lines[mIndex] = header.joinToString(" ")
+        return lines.joinToString("\r\n")
+    }
 
     // ---- Ecra preto ("Ajuste Tecnico / Aguarde...") no dispositivo controlado ----
     // ---- Ecra "preto" (privacidade) ----
