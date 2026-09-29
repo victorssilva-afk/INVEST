@@ -214,3 +214,10 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - iOS: NAO implementado por decisao do utilizador (controlo remoto e impossivel no iOS nao-jailbroken; so daria visualizacao).
 - PRIVACIDADE em EMULADOR: impossivel (cliente preto + tecnico normal) — emulador nao tem brilho fisico; a imagem que o emulador mostra E a que e capturada. So funciona em telemovel REAL (brilho fisico a 0). Limitacao fisica, nao bug.
 - NAO testavel no ambiente (sem toolchain Android) -> requer rebuild GitHub Actions + teste no emulador/aparelho.
+
+## 2026-06 — FLAG_SECURE: ecra preto em Chrome anonimo / jogos / apps bancarias
+- CAUSA: FLAG_SECURE (imposto pelo SurfaceFlinger/WindowManager) pinta a preto QUALQUER captura/MediaProjection dessas janelas. NAO ha bypass por codigo num Android nao-root (barreira do SO). So se desativa ao nivel do framework (modulo Magisk que corrige services.jar, ou LSPosed Disable-FLAG_SECURE).
+- Opcao A (guia): /app/docs/desbloquear-flag-secure-emulador.md — passo-a-passo Magisk + modulo FlagSecure Disabler / LSPosed p/ emulador com root. Guia = solucao garantida.
+- Opcao C (auto root): RootUtil.kt deteta root/Magisk e se o modulo ja esta instalado. Android envia msg WS "caps" {root,magisk,secureUnlocked,android,device} ao tecnico ao ligar. Tecnico ve barra de estado no viewer e botao "Desbloquear FLAG_SECURE (root)" -> envia "unlock-secure" -> app descarrega+instala o modulo Magisk (BuildConfig.FLAG_SECURE_MODULE_URL) via `magisk --install-module` e pede reboot. Falha graciosa -> mensagem + guia.
+- Backend WS ja faz relay de qualquer JSON (sem alteracao). Viewer: barra ci-secure-bar + botao ci-unlock-secure.
+- NAO testavel no ambiente (sem device/emulador root) -> requer rebuild APK + teste real. URL do modulo pode precisar de ajuste conforme o nome do asset do release.
