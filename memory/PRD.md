@@ -227,3 +227,10 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Consentimento obrigatorio: unlockSecure() no servico so instala se secure_consent=true; senao envia unlock-result "a aguardar consentimento" e postConsentRequestNotification() (notificacao abre MainActivity com show_unlock_consent=true para o cliente aceitar). Fluxo legal: consentimento vive no aparelho do cliente.
 - Layout: activity_main.xml novo botao unlockBtn + texto explicativo. Guia docs/ atualizado (1a pelo aparelho, 1b pelo tecnico).
 - Limitacao: continua a exigir root+Magisk+reboot (unica forma real de patch de framework). DRM continua preto (hardware). NAO testado (sem device) -> rebuild APK + teste.
+
+## 2026-06 — FIX: FLAG_SECURE nao passava (URL do modulo estava morto)
+- BUG: FLAG_SECURE_MODULE_URL apontava para BlassGO/Android-FlagSecure-Disabler/releases/latest que NAO TEM release -> download falhava sempre -> "nao passa".
+- FIX: mudado para o modulo LSPosed mantido DisableFlagSecure (veeti) APK: github.com/veeti/DisableFlagSecure/releases/download/1.2/1.2.apk (verificado 200, ~54KB). RootUtil reescrito: instala o APK via root (pm install -r -d), deteta LSPosed, e devolve msg a pedir para ATIVAR no LSPosed (scope System) + REINICIAR. isModuleInstalled() via pm list packages fi.veetipaananen.android.disableflagsecure.
+- NAO existe metodo runtime sem reboot (confirmado): so Frida (needs frida-server) ou modulo LSPosed/Magisk (framework). Escolhido LSPosed APK por ser instalavel automaticamente e mantido.
+- Passos manuais irredutiveis (LSPosed obriga): ativar modulo no scope Sistema + reiniciar. Guia docs/ reescrito com URLs corretos (Magisk+Zygisk+LSPosed JingMatrix+DisableFlagSecure).
+- NAO testado (sem device/emulador root) -> rebuild APK + teste.

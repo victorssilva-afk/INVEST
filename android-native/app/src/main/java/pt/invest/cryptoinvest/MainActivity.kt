@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
                 "Passa a ser possível ver e partilhar apps normalmente protegidas (banca, separador anónimo, alguns jogos).\n\n" +
                 "⚠️ Só deve ativar em aparelhos SEUS e para suporte técnico AUTORIZADO por si. " +
                 "Ao continuar, declara que consente e que é o responsável pelo aparelho.\n\n" +
-                "É necessário reiniciar o aparelho depois de instalar."
+                "Depois de instalar, é preciso ATIVAR o módulo no LSPosed e REINICIAR o aparelho."
             )
             .setPositiveButton("Aceito e desativar") { _, _ ->
                 getSharedPreferences("ci", Context.MODE_PRIVATE).edit().putBoolean("secure_consent", true).apply()

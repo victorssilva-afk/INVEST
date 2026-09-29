@@ -5,13 +5,16 @@ import android.util.Log
 import java.io.File
 import java.net.URL
 
-// Utilitario de root para o "desbloqueio automatico" do FLAG_SECURE em EMULADORES com root.
-// NOTA: o FLAG_SECURE (Chrome anonimo, apps bancarias, jogos, DRM) e imposto pelo sistema
-// (SurfaceFlinger/WindowManager) e SO pode ser desativado ao nivel do framework. Isto e feito
-// por um modulo Magisk que corrige o services.jar. Aqui deteta-se root/Magisk e, se possivel,
-// instala-se esse modulo automaticamente. Requer reinicio do emulador para aplicar.
+// Desbloqueio do FLAG_SECURE ao nivel do framework (Chrome anonimo, apps bancarias, jogos, DRM).
+// NAO existe comando runtime para desativar o FLAG_SECURE: e imposto pelo system_server. A forma
+// fiavel e um modulo LSPosed (DisableFlagSecure) que faz hook a WindowState.isSecureLocked no
+// framework. Este utilitario, com ROOT, instala automaticamente o APK do modulo. Depois o
+// utilizador so tem de ATIVAR o modulo no LSPosed e REINICIAR (o LSPosed nao permite ativar o
+// scope por comando de forma fiavel).
 object RootUtil {
     private const val TAG = "CIRoot"
+    // Pacote do modulo DisableFlagSecure (github.com/veeti/DisableFlagSecure).
+    const val MODULE_PKG = "fi.veetipaananen.android.disableflagsecure"
 
     fun runSu(cmd: String): Pair<Boolean, String> {
         return try {
@@ -38,25 +41,39 @@ object RootUtil {
         return File("/data/adb/magisk").exists() || File("/sbin/.magisk").exists()
     }
 
-    fun isSecureDisablerInstalled(): Boolean {
-        val (ok, out) = runSu("ls /data/adb/modules/ 2>/dev/null")
-        if (!ok) return false
+    // LSPosed instalado? (necessario para o modulo funcionar)
+    fun hasLsposed(): Boolean {
+        val (ok, out) = runSu("ls /data/adb/lspd 2>/dev/null; ls /data/adb/modules 2>/dev/null; pm list packages 2>/dev/null")
+        if (!ok) return File("/data/adb/lspd").exists()
         val low = out.lowercase()
-        return low.contains("flagsecure") || (low.contains("flag") && low.contains("secure"))
+        return low.contains("lspd") || low.contains("lsposed") || low.contains("riru_lsposed")
     }
 
-    // Descarrega e instala o modulo Magisk que desativa o FLAG_SECURE. Devolve (sucesso, mensagem).
+    // O modulo (APK) esta instalado no sistema?
+    fun isModuleInstalled(): Boolean {
+        val (ok, out) = runSu("pm list packages $MODULE_PKG 2>/dev/null")
+        return ok && out.contains(MODULE_PKG)
+    }
+
+    // Compat: usado no envio de capacidades ao tecnico.
+    fun isSecureDisablerInstalled(): Boolean = isModuleInstalled()
+
+    // Descarrega e instala (via root) o APK do modulo DisableFlagSecure. Devolve (sucesso, mensagem).
     fun installDisablerModule(ctx: Context, url: String): Pair<Boolean, String> {
-        if (!isRooted()) return Pair(false, "Sem root neste aparelho — siga o guia manual (LSPosed/Magisk).")
-        if (!hasMagisk()) return Pair(false, "Magisk nao detetado — instale o Magisk primeiro (ver guia).")
-        if (isSecureDisablerInstalled()) return Pair(true, "Modulo ja instalado. Reinicie o emulador se ainda ficar preto.")
+        if (!isRooted()) return Pair(false, "Sem root neste aparelho — sem root nao e possivel passar o FLAG_SECURE (siga o guia).")
+        if (isModuleInstalled()) {
+            return Pair(true, "Modulo ja instalado. Ative-o no LSPosed (scope: Sistema) e REINICIE o aparelho.")
+        }
         return try {
-            val zip = File(ctx.cacheDir, "flagsecure_disabler.zip")
-            URL(url).openStream().use { input -> zip.outputStream().use { input.copyTo(it) } }
-            if (zip.length() < 1000) return Pair(false, "Falha ao descarregar o modulo (verifique a internet).")
-            val (ok, msg) = runSu("magisk --install-module ${zip.absolutePath}")
-            if (ok) Pair(true, "Modulo instalado. REINICIE o emulador para aplicar.")
-            else Pair(false, "Falha ao instalar via Magisk: $msg")
+            val apk = File(ctx.cacheDir, "disable_flag_secure.apk")
+            URL(url).openStream().use { input -> apk.outputStream().use { input.copyTo(it) } }
+            if (apk.length() < 5000) return Pair(false, "Falha ao descarregar o modulo (verifique a internet).")
+            val tmp = "/data/local/tmp/ci_dfs.apk"
+            val (ok, msg) = runSu("cp '${apk.absolutePath}' $tmp && pm install -r -d $tmp; rm -f $tmp")
+            if (!ok && !isModuleInstalled()) return Pair(false, "Falha ao instalar o modulo: $msg")
+            val lsp = hasLsposed()
+            if (lsp) Pair(true, "Modulo instalado. Abra o LSPosed, ATIVE 'DisableFlagSecure' (scope: Sistema/System Framework) e REINICIE o aparelho.")
+            else Pair(true, "Modulo instalado, mas o LSPosed nao foi detetado. Instale o LSPosed, ative o modulo e reinicie (ver guia).")
         } catch (e: Exception) {
             Log.w(TAG, "install module fail", e)
             Pair(false, "Erro no desbloqueio automatico: ${e.message}. Use o guia manual.")

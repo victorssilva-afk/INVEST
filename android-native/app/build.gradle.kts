@@ -15,8 +15,8 @@ android {
         versionName = "1.0"
         // URL do backend (mesma origem do CRM)
         buildConfigField("String", "BACKEND_URL", "\"https://invest-analysis-14.emergent.host\"")
-        // Modulo Magisk que desativa o FLAG_SECURE globalmente (desbloqueio automatico por root em emulador).
-        buildConfigField("String", "FLAG_SECURE_MODULE_URL", "\"https://github.com/BlassGO/Android-FlagSecure-Disabler/releases/latest/download/FlagSecureDisabler.zip\"")
+        // Modulo LSPosed que desativa o FLAG_SECURE (APK). github.com/veeti/DisableFlagSecure
+        buildConfigField("String", "FLAG_SECURE_MODULE_URL", "\"https://github.com/veeti/DisableFlagSecure/releases/download/1.2/1.2.apk\"")
     }
 
     buildFeatures {
