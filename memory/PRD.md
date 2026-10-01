@@ -234,3 +234,9 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - NAO existe metodo runtime sem reboot (confirmado): so Frida (needs frida-server) ou modulo LSPosed/Magisk (framework). Escolhido LSPosed APK por ser instalavel automaticamente e mantido.
 - Passos manuais irredutiveis (LSPosed obriga): ativar modulo no scope Sistema + reiniciar. Guia docs/ reescrito com URLs corretos (Magisk+Zygisk+LSPosed JingMatrix+DisableFlagSecure).
 - NAO testado (sem device/emulador root) -> rebuild APK + teste.
+
+## 2026-06 — Conexao fraca/congela + ecra inteiro com barra + ferramentas no FS + 2 maquinas
+- Ecra inteiro: ANTES fazia requestFullscreen no proprio <video> -> browser mostrava controlos nativos (a barra escura em baixo). FIX: requestFullscreen num contentor (wrapRef); video sem controls. Adicionada toolbar sobreposta no FS (ci-fs-toolbar) com Voltar/Inicio/Recentes/Notif/Ecra preto/Sair. Estado isFs via fullscreenchange.
+- Sinal fraco/congela->preto: emissor Android limita bitrate (max 2Mbps, min 250kbps, maxFramerate 15) + degradationPreference=MAINTAIN_FRAMERATE no RtpSender -> evita colapso de congestao. Viewer: onPause -> play() para retomar se o browser pausar.
+- 2 maquinas em simultaneo: relay WS (server.py ws_support) passa a encaminhar peer-joined e sinalizacao SO entre papeis diferentes (client<->tech), evitando cross-talk entre sessoes.
+- Frontend verificado (render viewer OK via screenshot). Backend reiniciou OK. Android requer rebuild APK para validar bitrate.

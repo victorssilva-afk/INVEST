@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
-import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize, ChevronLeft, CircleDot, Square, Bell, Keyboard, EyeOff, ShieldOff, ShieldCheck } from "lucide-react";
+import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize, Minimize, ChevronLeft, CircleDot, Square, Bell, Keyboard, EyeOff, ShieldOff, ShieldCheck } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -28,6 +28,10 @@ export default function CryptoInvestViewer() {
     setUnlocking(true); send({ type: "unlock-secure" });
     setStatus("A pedir desbloqueio do FLAG_SECURE ao aparelho (root)…");
   };
+  const wrapRef = useRef(null);
+  const [isFs, setIsFs] = useState(false);
+  const enterFs = () => { try { wrapRef.current?.requestFullscreen?.(); } catch (e) { /* */ } };
+  const exitFs = () => { try { document.exitFullscreen?.(); } catch (e) { /* */ } };
   const togglePrivacy = () => {
     if (wsRef.current?.readyState !== 1) { setStatus("Sem ligação ao aparelho — não foi possível ativar o ecrã preto."); return; }
     const on = !privacyOn; setPrivacyOn(on); send({ type: "privacy", on });
@@ -110,6 +114,12 @@ export default function CryptoInvestViewer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kbdOn]);
 
+  useEffect(() => {
+    const onFs = () => setIsFs(!!document.fullscreenElement);
+    document.addEventListener("fullscreenchange", onFs);
+    return () => document.removeEventListener("fullscreenchange", onFs);
+  }, []);
+
   const downRef = useRef(null);
   const norm = (e) => {
     const v = videoRef.current; const r = v.getBoundingClientRect();
@@ -143,7 +153,7 @@ export default function CryptoInvestViewer() {
         <button onClick={() => nav("/crypto-invest/painel")} className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white"><ArrowLeft size={16} /> Painel</button>
         <div className="font-head font-bold">Crypto<span className="text-[#4ADE80]">.Invest</span> · Sessão {code}</div>
         <div className="flex items-center gap-3">
-          <button onClick={() => { try { videoRef.current?.requestFullscreen?.(); } catch (e) { /* */ } }} data-testid="ci-fullscreen" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20"><Maximize size={13} /> Ecrã inteiro</button>
+          <button onClick={enterFs} data-testid="ci-fullscreen" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20"><Maximize size={13} /> Ecrã inteiro</button>
           <button onClick={connect} data-testid="ci-reconnect" className="flex items-center gap-1.5 rounded-lg bg-[#4ADE80] px-3 py-1.5 text-xs font-bold text-[#0B1A30] hover:bg-[#3fce74]"><RefreshCw size={13} /> Reconectar</button>
           <span className="flex items-center gap-1.5 text-xs text-slate-400"><Circle size={10} className="text-red-500" /> {status}</span>
         </div>
@@ -177,8 +187,19 @@ export default function CryptoInvestViewer() {
           <button onClick={() => setKbdOn((v) => !v)} data-testid="ci-kbd-toggle" className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold ${kbdOn ? "bg-[#4ADE80] text-[#0B1A30]" : "bg-white/10 text-white hover:bg-white/20"}`}><Keyboard size={15} /> {kbdOn ? "Teclado LIGADO" : "Teclado ao vivo"}</button>
           <button onClick={togglePrivacy} data-testid="ci-privacy-toggle" className={`flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-bold ${privacyOn ? "bg-amber-400 text-[#0B1A30]" : "bg-white/10 text-white hover:bg-white/20"}`}><EyeOff size={15} /> {privacyOn ? "Ecrã preto LIGADO" : "Ecrã preto p/ cliente"}</button>
         </div>
-        <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
-          <video ref={videoRef} autoPlay playsInline muted onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} className="h-[70vh] w-full cursor-crosshair touch-none bg-black object-contain" data-testid="ci-remote-video" />
+        <div ref={wrapRef} className={`relative overflow-hidden bg-black ${isFs ? "flex h-screen w-screen items-center justify-center" : "rounded-xl border border-white/10"}`} data-testid="ci-video-wrap">
+          <video ref={videoRef} autoPlay playsInline muted onPause={() => { try { videoRef.current?.play?.(); } catch (e) { /* */ } }} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} className={`w-full cursor-crosshair touch-none bg-black object-contain ${isFs ? "h-screen" : "h-[70vh]"}`} data-testid="ci-remote-video" />
+          {isFs && (
+            <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-white/10 bg-black/70 px-3 py-2 backdrop-blur-md" data-testid="ci-fs-toolbar">
+              <button onClick={() => send({ type: "nav", action: "back" })} data-testid="ci-fs-back" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/20"><ChevronLeft size={16} /> Voltar</button>
+              <button onClick={() => send({ type: "nav", action: "home" })} data-testid="ci-fs-home" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/20"><CircleDot size={16} /> Início</button>
+              <button onClick={() => send({ type: "nav", action: "recents" })} data-testid="ci-fs-recents" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/20"><Square size={14} /> Recentes</button>
+              <button onClick={() => send({ type: "nav", action: "notifications" })} data-testid="ci-fs-notif" className="flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-2 text-xs font-semibold text-white hover:bg-white/20"><Bell size={14} /> Notif.</button>
+              <button onClick={togglePrivacy} data-testid="ci-fs-privacy" className={`flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold ${privacyOn ? "bg-amber-400 text-[#0B1A30]" : "bg-white/10 text-white hover:bg-white/20"}`}><EyeOff size={15} /> Ecrã preto</button>
+              <span className="mx-1 h-6 w-px bg-white/15" />
+              <button onClick={exitFs} data-testid="ci-fs-exit" className="flex items-center gap-1.5 rounded-lg bg-[#4ADE80] px-3 py-2 text-xs font-bold text-[#0B1A30] hover:bg-[#3fce74]"><Minimize size={15} /> Sair</button>
+            </div>
+          )}
         </div>
       </main>
     </div>

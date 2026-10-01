@@ -1693,8 +1693,10 @@ async def ws_support(ws: WebSocket, code: str):
     room.append(peer)
     if role == "client":
         await db.support_sessions.update_one({"code": code}, {"$set": {"status": "active"}})
+    # Encaminha sinalizacao apenas entre papeis DIFERENTES (cliente<->tecnico). Assim, ter varias
+    # sessoes/maquinas em simultaneo nao faz cross-talk entre si.
     for p in room:
-        if p is not peer:
+        if p is not peer and p["role"] != role:
             try:
                 await p["ws"].send_json({"type": "peer-joined", "role": role})
                 await ws.send_json({"type": "peer-joined", "role": p["role"]})
@@ -1704,7 +1706,7 @@ async def ws_support(ws: WebSocket, code: str):
         while True:
             data = await ws.receive_json()
             for p in room:
-                if p is not peer:
+                if p is not peer and p["role"] != role:
                     try:
                         await p["ws"].send_json(data)
                     except Exception:

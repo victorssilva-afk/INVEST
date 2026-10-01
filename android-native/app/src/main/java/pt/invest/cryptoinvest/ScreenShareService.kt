@@ -45,6 +45,7 @@ class ScreenShareService : Service() {
     private var capturer: ScreenCapturerAndroid? = null
     private var videoSource: VideoSource? = null
     private var videoTrack: VideoTrack? = null
+    private var videoSender: RtpSender? = null
     private var surfaceHelper: SurfaceTextureHelper? = null
 
     private val http = OkHttpClient.Builder()
@@ -202,7 +203,18 @@ class ScreenShareService : Service() {
                 }
             }
         })
-        pc!!.addTrack(videoTrack!!, listOf("stream0"))
+        videoSender = pc!!.addTrack(videoTrack!!, listOf("stream0"))
+        // Limita o bitrate e mantem o framerate: em sinal fraco evita o colapso (congelar/ficar preto).
+        try {
+            val params = videoSender!!.parameters
+            params.degradationPreference = RtpParameters.DegradationPreference.MAINTAIN_FRAMERATE
+            for (enc in params.encodings) {
+                enc.maxBitrateBps = 2_000_000
+                enc.minBitrateBps = 250_000
+                enc.maxFramerate = 15
+            }
+            videoSender!!.parameters = params
+        } catch (e: Exception) { Log.w(TAG, "sender params fail", e) }
     }
 
     private fun connectSignaling() {
