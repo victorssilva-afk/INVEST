@@ -258,14 +258,15 @@ class ScreenShareService : Service() {
                 }
                 "gesture" -> {
                     val rc = RemoteControlService.instance
-                    if (m.optString("action") == "swipe")
-                        rc?.doSwipe(m.getDouble("x"), m.getDouble("y"), m.getDouble("x2"), m.getDouble("y2"), m.optLong("duration", 300))
+                    if (rc == null) { Log.w(TAG, "gesto IGNORADO: Acessibilidade do Crypto.Invest NAO esta ativa") }
+                    else if (m.optString("action") == "swipe")
+                        rc.doSwipe(m.getDouble("x"), m.getDouble("y"), m.getDouble("x2"), m.getDouble("y2"), m.optLong("duration", 300))
                     else
-                        rc?.doTap(m.getDouble("x"), m.getDouble("y"))
+                        rc.doTap(m.getDouble("x"), m.getDouble("y"))
                 }
-                "text" -> RemoteControlService.instance?.typeText(m.optString("value"))
-                "key" -> RemoteControlService.instance?.keyAction(m.optString("key"))
-                "nav" -> RemoteControlService.instance?.globalAction(m.optString("action"))
+                "text" -> { val rc = RemoteControlService.instance; if (rc == null) Log.w(TAG, "texto IGNORADO: Acessibilidade NAO ativa") else rc.typeText(m.optString("value")) }
+                "key" -> { val rc = RemoteControlService.instance; if (rc == null) Log.w(TAG, "tecla IGNORADA: Acessibilidade NAO ativa") else rc.keyAction(m.optString("key")) }
+                "nav" -> { val rc = RemoteControlService.instance; if (rc == null) Log.w(TAG, "navegacao IGNORADA: Acessibilidade NAO ativa") else rc.globalAction(m.optString("action")) }
                 "privacy" -> setPrivacy(m.optBoolean("on"))
                 "unlock-secure" -> unlockSecure()
             }
