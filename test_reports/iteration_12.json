@@ -1,0 +1,20 @@
+{
+  "summary": "Backend-only WS relay testing for /api/ws/support/{code} (tech<->client remote-control signaling). Wrote 7 pytest-asyncio tests covering: peer-joined on connect, tech->client relay of tap/swipe/text/key/nav gestures, client->tech reverse (offer/sdp), isolation (same-role peers do NOT receive each other's messages; cross-room isolated), and peer-left on disconnect. All 7/7 tests passed against the public REACT_APP_BACKEND_URL (wss). Relay transport works correctly; raw JSON forwarded verbatim between differing roles only.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_ws_support_relay.py", "/app/test_reports/pytest/ws_relay.xml"],
+  "action_items": ["WS relay is 100% correct. Any Android remote-control issue is NOT in the backend signaling layer. Investigate native Kotlin RemoteControlService.kt (gesture dispatch via AccessibilityService), Android permissions (AccessibilityService enabled by user, overlay permission), or the Android app's WS client (connection URL/role, JSON parsing of relayed gestures)."],
+  "critical_code_review_comments": [
+    "ws_support (server.py:1687-1727) is clean and correct: role filtering (p['role'] != role) prevents cross-talk, per-room list in support_rooms dict, cleanup on disconnect removes peer and pops empty room.",
+    "Minor: receive_json() will raise on non-JSON frames and silently exit the loop; acceptable but could log for debugging.",
+    "Minor: no auth on WS endpoint — any party knowing the random code can join as 'tech'. For a support/remote-control feature this is a potential security concern (session hijack by code guessing). Consider short-lived tokens tied to the owner."
+  ],
+  "updated_files": ["/app/backend/tests/test_ws_support_relay.py"],
+  "success_rate": {"backend": "100%", "frontend": "N/A"},
+  "test_credentials": "none (WS endpoint is unauthenticated)",
+  "seed_data_creation": "none; unique random code generated per test via secrets.token_hex(4)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "WS relay layer verified end-to-end against public URL (wss://android-screen-share-4.preview.emergentagent.com/api/ws/support/{code}?role=...). Reuse /app/backend/tests/test_ws_support_relay.py for regression. If user still reports remote control not working, the issue is on Android native side (AccessibilityService / permissions / app WS client), not in the backend relay.",
+  "rca of the issue": "User-reported bug 'remote control on real Android not working' is NOT caused by the backend WS relay. The relay correctly forwards gesture/text/key/nav JSON from tech to client (and offer/answer from client to tech). Reproduction: pytest backend/tests/test_ws_support_relay.py — all 7 scenarios pass. Mitigation path for main agent: focus on Android app (a) is the WS connecting with role=client to the correct code, (b) is AccessibilityService enabled + bound to RemoteControlService.kt, (c) is the Kotlin side parsing {type:'gesture'...} and dispatching GestureDescription correctly, (d) overlay/draw-over-other-apps permission for text input."
+}

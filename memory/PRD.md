@@ -130,6 +130,12 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Windows Electron já abre /conectar?autostart=1 (app de partilha, não CRM) — precisa rebuild.
 - E2E preview testado (curl): my-link, criar/apagar agente, connect via tech_token atribui ao admin.
 
+## 2026-06 — FIX: controlo remoto nao funciona em aparelho FISICO real (causa-raiz)
+- CAUSA-RAIZ (RemoteControlService.kt doTap): o toque era um Path so com moveTo(x,y) -> comprimento ZERO. Emuladores x86 toleravam, mas aparelhos FISICOS reais IGNORAM gestos de comprimento 0 (o toque "nao faz nada"). Confirmado por docs/StackOverflow (GestureDescription.StrokeDescription exige path com comprimento).
+- FIX: (1) doTap agora usa moveTo+lineTo (micro-deslocamento 1px) -> comprimento != 0; duracao = ViewConfiguration.getTapTimeout() (60..200ms) em vez de 80ms fixo (duracao curta falha intermitente). (2) doSwipe garante comprimento >=2px mesmo com inicio~fim. (3) TODOS os gestos/nav/texto despachados na MAIN THREAD (alguns OEM ignoram fora dela). (4) GestureResultCallback regista no Logcat onCompleted/onCancelled + dispatchGesture false -> diagnostico real em aparelho fisico. (5) ScreenShareService/RemoteControlService registam "Acessibilidade NAO ativa" quando instance==null (comando ignorado) e "Acessibilidade LIGADA" ao conectar.
+- Backend WS relay (tech->client gesture/text/key/nav + client->tech offer) VERIFICADO 100% pelo testing agent (iteration_12, 7/7). O transporte dos comandos esta correto; a falha era so a execucao nativa do gesto.
+- NAO compilavel/testavel no container (sem kotlinc/aapt2 arm64) -> requer Save to GitHub -> workflow android-native.yml -> instalar APK -> testar no aparelho fisico (Acessibilidade do Crypto.Invest ATIVA). Logcat filtrar por tag "CIScreenShare" para ver toque/deslize executado/cancelado.
+
 ## Backlog / Próximos (P1/P2)
 - P1: Notificações por email (preparado, desativado a pedido).
 - P1: Dados macro/on-chain reais (requerem fontes/chaves pagas — atualmente "Dados indisponíveis nesta fonte").
