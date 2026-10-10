@@ -221,3 +221,11 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Opcao C (auto root): RootUtil.kt deteta root/Magisk e se o modulo ja esta instalado. Android envia msg WS "caps" {root,magisk,secureUnlocked,android,device} ao tecnico ao ligar. Tecnico ve barra de estado no viewer e botao "Desbloquear FLAG_SECURE (root)" -> envia "unlock-secure" -> app descarrega+instala o modulo Magisk (BuildConfig.FLAG_SECURE_MODULE_URL) via `magisk --install-module` e pede reboot. Falha graciosa -> mensagem + guia.
 - Backend WS ja faz relay de qualquer JSON (sem alteracao). Viewer: barra ci-secure-bar + botao ci-unlock-secure.
 - NAO testavel no ambiente (sem device/emulador root) -> requer rebuild APK + teste real. URL do modulo pode precisar de ajuste conforme o nome do asset do release.
+
+## 2026-06 — FLAG_SECURE / root: REMOVIDO a pedido do utilizador
+- Removida toda a funcionalidade de desbloqueio de FLAG_SECURE por root, do app e do site.
+- Android: apagado RootUtil.kt; ScreenShareService.kt sem sendCaps()/unlockSecure()/postGenericNotification() e sem tratar "unlock-secure"; build.gradle.kts sem buildConfigField FLAG_SECURE_MODULE_URL.
+- Frontend (CryptoInvestViewer.jsx): removida barra ci-secure-bar, botão ci-unlock-secure, estado caps/unlocking, handlers "caps"/"unlock-result" e ícones ShieldOff/ShieldCheck.
+- Apagado /app/docs/desbloquear-flag-secure-emulador.md.
+- Mantidos SYSTEM_ALERT_WINDOW + WRITE_SETTINGS (usados pelo ecrã de privacidade por brilho, não pelo FLAG_SECURE).
+- Frontend compila OK. Alterações Android requerem rebuild via GitHub Actions.
