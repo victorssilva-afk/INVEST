@@ -385,7 +385,7 @@ async def get_client(cid: str, user: dict = Depends(get_current_user)):
     c = await db.clients.find_one({"id": cid, "tenant_id": user["tenant_id"]}, {"_id": 0})
     if not c:
         raise HTTPException(404, "Cliente não encontrado")
-    invoices = await db.invoices.find({"client_id": cid, "tenant_id": user["tenant_id"]}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    invoices = await db.invoices.find({"client_id": cid, "tenant_id": user["tenant_id"]}, {"_id": 0, "qr_code": 0}).sort("created_at", -1).to_list(500)
     metrics = {"total_faturado": sum(i["totals"]["total"] for i in invoices),
                "n_faturas": len(invoices),
                "pago": sum(i["totals"]["total"] for i in invoices if i["status"] == "pago"),
@@ -536,7 +536,7 @@ async def delete_invoice(iid: str, user: dict = Depends(require_roles("admin")))
 # ================= DASHBOARD =================
 @api.get("/dashboard")
 async def dashboard(user: dict = Depends(get_current_user)):
-    invs = await db.invoices.find({"tenant_id": user["tenant_id"]}, {"_id": 0}).to_list(5000)
+    invs = await db.invoices.find({"tenant_id": user["tenant_id"]}, {"_id": 0, "qr_code": 0}).to_list(5000)
     def s(st):
         return sum(i["totals"]["total"] for i in invs if i["status"] == st)
     kpis = {
@@ -764,11 +764,14 @@ async def reports(date_from: str = "", date_to: str = "", status: str = "", user
     query = {"tenant_id": user["tenant_id"]}
     if status:
         query["status"] = status
-    invs = await db.invoices.find(query, {"_id": 0}).to_list(5000)
-    if date_from:
-        invs = [i for i in invs if i["created_at"] >= date_from]
-    if date_to:
-        invs = [i for i in invs if i["created_at"] <= date_to + "T23:59:59"]
+    if date_from or date_to:
+        created = {}
+        if date_from:
+            created["$gte"] = date_from
+        if date_to:
+            created["$lte"] = date_to + "T23:59:59"
+        query["created_at"] = created
+    invs = await db.invoices.find(query, {"_id": 0, "qr_code": 0}).to_list(5000)
     total = sum(i["totals"]["total"] for i in invs)
     return {"count": len(invs), "total": round(total, 2),
             "pago": round(sum(i["totals"]["total"] for i in invs if i["status"] == "pago"), 2),
