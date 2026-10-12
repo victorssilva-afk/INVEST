@@ -272,17 +272,21 @@ function PdfTab() {
   };
 
   const printPdf = () => {
-    const w = window.open("", "_blank");
-    if (!w) return;
+    let content;
     if (mode === "personalizado") {
-      w.document.write(html);
+      content = html;
     } else {
       const node = previewRef.current;
-      if (!node) { w.close(); return; }
-      w.document.write(`<html><head><title>${doc?.title || "Documento"}</title><style>@page{margin:0}body{margin:0}</style></head><body>${node.outerHTML}</body></html>`);
+      if (!node) return;
+      content = `<html><head><title>${doc?.title || "Documento"}</title><style>@page{margin:0}body{margin:0}</style></head><body>${node.outerHTML}</body></html>`;
     }
-    w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 500);
+    const url = URL.createObjectURL(new Blob([content], { type: "text/html" }));
+    const w = window.open(url, "_blank");
+    if (!w) { URL.revokeObjectURL(url); return; }
+    setTimeout(() => {
+      try { w.focus(); w.print(); } catch (e) { console.error("Falha ao imprimir:", e); }
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }, 800);
   };
 
   const hasOutput = mode === "personalizado" ? !!html : !!doc;
