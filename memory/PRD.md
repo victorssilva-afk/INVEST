@@ -234,3 +234,8 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - deployment_agent: PASS (após remover .env/.env.*/*.env do .gitignore e otimizar queries de faturas).
 - Queries: dashboard/get_client/reports agora com projeção {_id:0, qr_code:0}; reports filtra datas no Mongo (created_at $gte/$lte).
 - testing_agent iteration_12: backend 7/7, frontend 100%. FLAG_SECURE removido sem referências órfãs; sem qr_code a vazar nas respostas. App pronta para deploy web.
+
+## 2026-06 — Revisão de código: correções aplicadas (seletivas)
+- APLICADO: Assistente.jsx printPdf() deixou de usar document.write() (risco XSS) → agora usa Blob URL + window.open (mantém impressão nos modos Estruturado e Personalizado). Verificado por testing_agent iteration_13 (100% frontend, 0 erros).
+- NÃO aplicado (falsos positivos confirmados por inspeção): "undefined vars" em server.py:920/1323/1493 e ai_routes.py:132 (todas atribuídas antes do uso ou o except levanta HTTPException); "is vs ==" em server.py/crypto_service.py são todos `is None`/`is not None` (idioma Python correto — trocar violaria PEP8).
+- NÃO aplicado (risco/arquitetura): token localStorage→httpOnly cookies (reescrita total de auth, quebra em domínio de preview cross-origin); refactors de complexidade e 274 catch-blocks vazios (churn sem valor, app estável e pronta p/ deploy).
