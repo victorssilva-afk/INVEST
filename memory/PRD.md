@@ -229,3 +229,8 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - Apagado /app/docs/desbloquear-flag-secure-emulador.md.
 - Mantidos SYSTEM_ALERT_WINDOW + WRITE_SETTINGS (usados pelo ecrã de privacidade por brilho, não pelo FLAG_SECURE).
 - Frontend compila OK. Alterações Android requerem rebuild via GitHub Actions.
+
+## 2026-06 — Deployment readiness + regressão verificada
+- deployment_agent: PASS (após remover .env/.env.*/*.env do .gitignore e otimizar queries de faturas).
+- Queries: dashboard/get_client/reports agora com projeção {_id:0, qr_code:0}; reports filtra datas no Mongo (created_at $gte/$lte).
+- testing_agent iteration_12: backend 7/7, frontend 100%. FLAG_SECURE removido sem referências órfãs; sem qr_code a vazar nas respostas. App pronta para deploy web.

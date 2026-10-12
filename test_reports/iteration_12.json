@@ -1,0 +1,22 @@
+{
+  "summary": "Regression test after FLAG_SECURE removal and qr_code projection changes. Backend: 7/7 pytest cases pass (login, dashboard, reports no-filter + date-filter + narrow range, clients list/detail, invoices list). Frontend: CryptoInvestViewer at /crypto-invest/sessao/:code loads cleanly after admin login, 11 required data-testids present (ci-reconnect, ci-privacy-toggle, ci-nav-back/home/recents/notif, ci-text-input, ci-text-send, ci-kbd-toggle, ci-fullscreen, ci-remote-video). No 'FLAG_SECURE' text in DOM, no 'Desbloquear FLAG_SECURE' button, no console errors, no page errors. Privacy toggle clickable, text input accepts typing. Remote video element renders (black as expected — no Android peer).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_regression_flag_removal.py",
+    "/app/test_reports/pytest/regression_flag.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py dashboard/reports/get_client correctly project out {_id:0, qr_code:0}. Reports date filter now inside Mongo query — good perf.",
+    "CryptoInvestViewer.jsx: FLAG_SECURE UI (bar, unlock button, caps/unlock-result handlers, ShieldOff/ShieldCheck imports) fully removed with no stale references. Clean removal."
+  ],
+  "updated_files": ["/app/backend/tests/test_regression_flag_removal.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100%"},
+  "test_credentials": "ADMIN euapostomesmo@proton.me / Invest2026! (works)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "FLAG_SECURE removal verified complete on web. Android native changes NOT testable in this env (separate GitHub Actions build). All regression endpoints after qr_code projection changes work correctly and no qr_code field leaks in dashboard/reports/client-detail responses.",
+  "rca of the issue": "N/A — no issues found"
+}
