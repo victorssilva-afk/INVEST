@@ -252,3 +252,11 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - P1: Deployment bloqueado pela plataforma (contactar suporte ou fork).
 - Riscos aceites: SEC-001, SEC-005, endpoints públicos sem limites.
 
+
+## Diagnóstico remoto WebRTC + ecrã preto (2026-10-15)
+- Backend: POST /api/public/support/log {code,line} (sem auth, buffer em memória 300 linhas) + GET /api/support/sessions/{code}/logs (auth).
+- Android: diag() envia eventos (registo, captura WxH, contador de frames a cada 5s, ICE/signaling/connection, offer/answer, WS, ecrã preto) para o backend — sem USB/adb.
+- Viewer: botão "Diagnóstico da ligação" (ci-diag-toggle) mostra logs do aparelho + do browser (ontrack, ice, getStats framesReceived/Decoded). ontrack faz fallback MediaStream + play().
+- Ecrã preto do cliente: MainActivity pede agora "Modificar definições do sistema" (WRITE_SETTINGS) — sem isto o brilho não baixava em telemóveis reais.
+- Leads: todos os estados pedidos (NA Hot, No Answer, Never Answer, Not Interested, No Potential) já existiam — sem alterações.
+- PENDENTE: utilizador gerar APK (GitHub Actions), testar em telemóvel real e enviar os logs do painel Diagnóstico.

@@ -9,9 +9,10 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from "recharts";
 import { Plus, Trash2, Link2, FileSpreadsheet, Archive, Crown, Clock, Trophy } from "lucide-react";
 import { toast } from "sonner";
 
-const STATUSES = ["No Answer", "NA Hot", "Not Interested", "Low Potential", "No Potential", "Duplicate"];
+const STATUSES = ["No Answer", "Never Answer", "NA Hot", "Not Interested", "Low Potential", "No Potential", "Duplicate"];
 const STATUS_CLS = {
   "No Answer": "bg-slate-100 text-slate-700",
+  "Never Answer": "bg-stone-200 text-stone-700",
   "NA Hot": "bg-red-100 text-red-700",
   "Not Interested": "bg-amber-100 text-amber-700",
   "Low Potential": "bg-blue-100 text-blue-700",

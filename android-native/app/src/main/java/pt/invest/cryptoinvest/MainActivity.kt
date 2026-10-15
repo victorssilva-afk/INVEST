@@ -20,6 +20,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var status: TextView
     private lateinit var connectBtn: Button
     private lateinit var projectionManager: MediaProjectionManager
+    private var askedWrite = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,7 +47,15 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             return
         }
-        // 3) Pedir permissao de captura de ecra
+        // 3) Permissao "Modificar definicoes do sistema" (brilho a 0 = ecra preto so para o cliente)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.System.canWrite(this) && !askedWrite) {
+            askedWrite = true
+            status.text = "Permita \"Modificar definições do sistema\" para o ecrã preto de ajuste técnico."
+            Toast.makeText(this, "Ative \"Modificar definições do sistema\" e volte a tocar CONECTAR", Toast.LENGTH_LONG).show()
+            startActivity(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:$packageName")))
+            return
+        }
+        // 4) Pedir permissao de captura de ecra
         status.text = "A pedir permissao de partilha de ecra..."
         startActivityForResult(projectionManager.createScreenCaptureIntent(), REQ_MEDIA_PROJECTION)
     }

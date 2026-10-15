@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { useAuth } from "@/context/AuthContext";
-import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize, ChevronLeft, CircleDot, Square, Bell, Keyboard, EyeOff } from "lucide-react";
+import { ArrowLeft, MousePointerClick, Circle, RefreshCw, Maximize, ChevronLeft, CircleDot, Square, Bell, Keyboard, EyeOff, Activity } from "lucide-react";
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 const WSB = process.env.REACT_APP_BACKEND_URL.replace(/^http/, "ws") + "/api/ws";
@@ -27,7 +27,32 @@ export default function CryptoInvestViewer() {
     setStatus(on ? "Ecrã preto enviado ao aparelho ✓" : "Ecrã preto desligado.");
   };
 
+  const [diagOn, setDiagOn] = useState(false);
+  const [localLogs, setLocalLogs] = useState([]);
+  const [devLogs, setDevLogs] = useState([]);
+  const addLog = (line) => setLocalLogs((l) => [...l.slice(-150), { at: new Date().toISOString(), line }]);
+
   useEffect(() => { if (ready && !user) nav("/crypto-invest"); }, [ready, user, nav]);
+
+  useEffect(() => {
+    if (!diagOn) return;
+    const tok = localStorage.getItem("invest_token");
+    const poll = async () => {
+      try { setDevLogs((await axios.get(`${API}/support/sessions/${code}/logs`, { headers: { Authorization: `Bearer ${tok}` } })).data); } catch (e) { /* */ }
+      const v = videoRef.current;
+      if (v && pcRef.current) {
+        try {
+          const st = await pcRef.current.getStats();
+          let info = "";
+          st.forEach((r) => { if (r.type === "inbound-rtp" && r.kind === "video") info = `frames recebidos=${r.framesReceived ?? 0} descodificados=${r.framesDecoded ?? 0} codec=${r.codecId || "?"}`; });
+          if (info) addLog(`técnico: ${info} · vídeo ${v.videoWidth}x${v.videoHeight}`);
+        } catch (e) { /* */ }
+      }
+    };
+    poll();
+    const t = setInterval(poll, 4000);
+    return () => clearInterval(t);
+  }, [diagOn, code]);
 
   const send = (m) => { try { wsRef.current?.readyState === 1 && wsRef.current.send(JSON.stringify(m)); } catch (e) { /* */ } };
 
@@ -43,10 +68,16 @@ export default function CryptoInvestViewer() {
     try { ice = (await axios.get(`${API}/support/ice`)).data.iceServers; } catch (e) { /* */ }
     const pc = new RTCPeerConnection({ iceServers: ice });
     pcRef.current = pc;
-    pc.ontrack = (e) => { if (videoRef.current) { videoRef.current.srcObject = e.streams[0]; setStatus("Ligado — a ver o ecrã do cliente"); } };
+    pc.ontrack = (e) => {
+      addLog(`técnico: ontrack ${e.track.kind} (streams=${e.streams.length})`);
+      const v = videoRef.current;
+      if (v) { v.srcObject = e.streams[0] || new MediaStream([e.track]); v.play?.().catch(() => {}); setStatus("Ligado — a ver o ecrã do cliente"); }
+    };
+    pc.oniceconnectionstatechange = () => addLog(`técnico: ice=${pc.iceConnectionState}`);
     pc.onicecandidate = (e) => { if (e.candidate) send({ type: "ice", candidate: e.candidate }); };
     pc.onconnectionstatechange = () => {
       if (pc !== pcRef.current) return;
+      addLog(`técnico: connection=${pc.connectionState}`);
       if (pc.connectionState === "connected") setStatus("Ligado — a ver o ecrã do cliente");
       else if (["disconnected", "failed"].includes(pc.connectionState)) {
         setStatus("Ligação perdida — a reconectar automaticamente…");
@@ -62,6 +93,7 @@ export default function CryptoInvestViewer() {
       const m = JSON.parse(ev.data);
       if (m.type === "peer-joined" && m.role === "client") { send({ type: "request-offer" }); }
       else if (m.type === "offer") {
+        addLog("técnico: offer recebida");
         try {
           await pc.setRemoteDescription(m.sdp);
           const ans = await pc.createAnswer();
@@ -69,7 +101,8 @@ export default function CryptoInvestViewer() {
           send({ type: "answer", sdp: ans });
           for (const c of pendingIceRef.current) { try { await pc.addIceCandidate(c); } catch (e) { /* */ } }
           pendingIceRef.current = [];
-        } catch (e) { /* */ }
+          addLog("técnico: answer enviada");
+        } catch (e) { addLog(`técnico: ERRO offer/answer ${e.message}`); }
       } else if (m.type === "ice" && m.candidate) {
         if (pc.remoteDescription) { try { await pc.addIceCandidate(m.candidate); } catch (e) { /* */ } }
         else pendingIceRef.current.push(m.candidate);
@@ -157,6 +190,19 @@ export default function CryptoInvestViewer() {
         <div className="overflow-hidden rounded-xl border border-white/10 bg-black">
           <video ref={videoRef} autoPlay playsInline muted onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} className="h-[70vh] w-full cursor-crosshair touch-none bg-black object-contain" data-testid="ci-remote-video" />
         </div>
+        <button onClick={() => setDiagOn((v) => !v)} data-testid="ci-diag-toggle" className="mt-3 flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20"><Activity size={13} /> {diagOn ? "Esconder diagnóstico" : "Diagnóstico da ligação"}</button>
+        {diagOn && (
+          <div className="mt-2 grid gap-3 md:grid-cols-2" data-testid="ci-diag-panel">
+            {[["Aparelho Android", devLogs, "ci-diag-device"], ["Técnico (browser)", localLogs, "ci-diag-local"]].map(([t, rows, id]) => (
+              <div key={id} className="rounded-xl border border-white/10 bg-black/40 p-3">
+                <div className="mb-2 text-xs font-bold text-[#4ADE80]">{t}</div>
+                <div data-testid={id} className="h-56 overflow-y-auto font-mono text-[11px] leading-5 text-slate-300">
+                  {rows.length === 0 ? <div className="text-slate-500">Sem registos ainda…</div> : rows.slice().reverse().map((r, i) => <div key={i}><span className="text-slate-500">{r.at.slice(11, 19)}</span> {r.line}</div>)}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );

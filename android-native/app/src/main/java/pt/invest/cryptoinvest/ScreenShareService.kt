@@ -72,10 +72,12 @@ class ScreenShareService : Service() {
         Thread {
             try {
                 code = registerDevice()
+                diag("registado code=$code · ${Build.MANUFACTURER} ${Build.MODEL} · Android ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
                 initWebRtc(data)
                 connectSignaling()
             } catch (e: Exception) {
                 Log.e(TAG, "start error", e)
+                diag("ERRO arranque: ${e.javaClass.simpleName}: ${e.message}")
             }
         }.start()
         return START_STICKY
@@ -174,9 +176,13 @@ class ScreenShareService : Service() {
         val cw = (Math.round(fullW * scale).toInt()) / 2 * 2
         val ch = (Math.round(fullH * scale).toInt()) / 2 * 2
         videoTrack = factory!!.createVideoTrack("SCREEN", videoSource!!)
+        videoTrack!!.addSink { frames++ }
         capturer!!.startCapture(cw, ch, 15)
+        diag("captura iniciada ${cw}x${ch}@15 (ecra ${fullW}x${fullH})")
+        startFrameMonitor()
 
         val ice = fetchIceServers()
+        diag("ice servers: ${ice.size}")
         val rtcConfig = PeerConnection.RTCConfiguration(ice).apply {
             sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
         }
@@ -186,15 +192,16 @@ class ScreenShareService : Service() {
                 send(JSONObject().put("type", "ice").put("candidate", cand))
             }
             override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {}
-            override fun onSignalingChange(s: PeerConnection.SignalingState?) {}
-            override fun onIceConnectionChange(s: PeerConnection.IceConnectionState?) {}
+            override fun onSignalingChange(s: PeerConnection.SignalingState?) { diag("signaling=$s") }
+            override fun onIceConnectionChange(s: PeerConnection.IceConnectionState?) { diag("ice=$s") }
             override fun onIceConnectionReceivingChange(b: Boolean) {}
-            override fun onIceGatheringChange(s: PeerConnection.IceGatheringState?) {}
+            override fun onIceGatheringChange(s: PeerConnection.IceGatheringState?) { diag("ice gathering=$s") }
             override fun onAddStream(stream: MediaStream?) {}
             override fun onRemoveStream(stream: MediaStream?) {}
             override fun onDataChannel(dc: DataChannel?) {}
             override fun onRenegotiationNeeded() {}
             override fun onConnectionChange(newState: PeerConnection.PeerConnectionState?) {
+                diag("connection=$newState")
                 if (newState == PeerConnection.PeerConnectionState.FAILED ||
                     newState == PeerConnection.PeerConnectionState.DISCONNECTED) {
                     lastOffer = 0L
@@ -202,7 +209,39 @@ class ScreenShareService : Service() {
                 }
             }
         })
-        pc!!.addTrack(videoTrack!!, listOf("stream0"))
+        val sender = pc!!.addTrack(videoTrack!!, listOf("stream0"))
+        diag("track adicionada: ${sender != null}")
+    }
+
+    @Volatile private var frames = 0L
+
+    private fun startFrameMonitor() {
+        var last = 0L
+        main.postDelayed(object : Runnable {
+            override fun run() {
+                if (closed) return
+                val f = frames
+                diag("frames capturados=$f (+${f - last} em 5s)")
+                last = f
+                main.postDelayed(this, 5000)
+            }
+        }, 5000)
+    }
+
+    private fun diag(msg: String) {
+        Log.i(TAG, msg)
+        val c = code ?: return
+        try {
+            val body = JSONObject().put("code", c).put("line", msg).toString()
+            val req = Request.Builder()
+                .url("${BuildConfig.BACKEND_URL}/api/public/support/log")
+                .post(body.toRequestBody("application/json; charset=utf-8".toMediaTypeOrNull()))
+                .build()
+            http.newCall(req).enqueue(object : okhttp3.Callback {
+                override fun onFailure(call: okhttp3.Call, e: java.io.IOException) {}
+                override fun onResponse(call: okhttp3.Call, response: Response) { response.close() }
+            })
+        } catch (e: Exception) {}
     }
 
     private fun connectSignaling() {
@@ -210,11 +249,13 @@ class ScreenShareService : Service() {
         val wsUrl = BuildConfig.BACKEND_URL.replaceFirst("http", "ws") + "/api/ws/support/$c?role=client"
         val req = Request.Builder().url(wsUrl).build()
         ws = http.newWebSocket(req, object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) { diag("sinalizacao WS ligada") }
             override fun onMessage(webSocket: WebSocket, text: String) { handleMessage(text) }
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 if (!closed) { try { Thread.sleep(1500) } catch (e: Exception) {}; connectSignaling() }
             }
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                diag("WS falhou: ${t.message}")
                 if (!closed) { try { Thread.sleep(2000) } catch (e: Exception) {}; connectSignaling() }
             }
         })
@@ -228,8 +269,10 @@ class ScreenShareService : Service() {
                 "request-offer" -> { makeOffer(); postReconnectNotification() }
                 "answer" -> {
                     val sdp = m.getJSONObject("sdp").getString("sdp")
+                    diag("answer recebida")
                     pc?.setRemoteDescription(object : SimpleSdpObserver() {
                         override fun onSetSuccess() {
+                            diag("answer aplicada")
                             remoteSet = true
                             synchronized(pendingCandidates) {
                                 for (cand in pendingCandidates) pc?.addIceCandidate(cand)
@@ -273,6 +316,7 @@ class ScreenShareService : Service() {
                 // tem sempre encoder por software -> evita o preto quando o H264 por HW falha no emulador.
                 val munged = SessionDescription(desc.type, preferVp8(desc.description))
                 pc?.setLocalDescription(SimpleSdpObserver(), munged)
+                diag("offer enviada (vp8 preferido)")
                 val sdp = JSONObject().put("type", "offer").put("sdp", munged.description)
                 send(JSONObject().put("type", "offer").put("sdp", sdp))
             }
@@ -317,7 +361,7 @@ class ScreenShareService : Service() {
             if (on) {
                 if (overlayView == null) {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && !Settings.canDrawOverlays(this)) {
-                        Log.w(TAG, "sem permissao de sobreposicao"); return@post
+                        diag("ecra preto: SEM permissao de sobreposicao"); return@post
                     }
                     val root = FrameLayout(this).apply { setBackgroundColor(Color.TRANSPARENT) }
                     val type = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
@@ -346,7 +390,8 @@ class ScreenShareService : Service() {
                         }
                         Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS_MODE, Settings.System.SCREEN_BRIGHTNESS_MODE_MANUAL)
                         Settings.System.putInt(contentResolver, Settings.System.SCREEN_BRIGHTNESS, 0)
-                    }
+                        diag("ecra preto: brilho do sistema a 0")
+                    } else diag("ecra preto: SEM permissao 'Modificar definicoes do sistema' (so overlay)")
                 } catch (e: Exception) { Log.w(TAG, "brightness fail", e) }
                 postPrivacyNotification()
             } else {

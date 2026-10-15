@@ -1282,7 +1282,7 @@ async def on_shutdown():
 
 
 # ---------------- Leads (acesso individual por utilizador) ----------------
-LEAD_STATUSES = ["No Answer", "NA Hot", "Not Interested", "Low Potential", "No Potential", "Duplicate"]
+LEAD_STATUSES = ["No Answer", "Never Answer", "NA Hot", "Not Interested", "Low Potential", "No Potential", "Duplicate"]
 PT_MONTHS = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho",
              "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 
@@ -1614,6 +1614,27 @@ async def my_support_link(user: dict = Depends(get_current_user)):
 @api.get("/support/ice")
 async def support_ice():
     return {"iceServers": ICE_SERVERS}
+
+
+support_logs: dict = {}
+
+
+class DiagIn(BaseModel):
+    code: str
+    line: str
+
+
+@api.post("/public/support/log")
+async def public_support_log(body: DiagIn):
+    buf = support_logs.setdefault(body.code[:16], [])
+    buf.append({"at": now_iso(), "line": body.line[:500]})
+    del buf[:-300]
+    return {"ok": True}
+
+
+@api.get("/support/sessions/{code}/logs")
+async def support_session_logs(code: str, user: dict = Depends(get_current_user)):
+    return support_logs.get(code, [])
 
 
 @api.get("/support/agents")

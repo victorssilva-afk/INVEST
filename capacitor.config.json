@@ -3,7 +3,7 @@
   "appName": "Crypto.Invest",
   "webDir": "build",
   "server": {
-    "url": "https://cripto-tela-viva.preview.emergentagent.com",
+    "url": "https://invest-crm.preview.emergentagent.com",
     "cleartext": false
   }
 }
