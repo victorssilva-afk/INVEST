@@ -1,0 +1,30 @@
+{
+  "summary": "Backend + UI testing of INVEST security hardening (random invoice number format, env-based agent seed, re.escape regex searches, TURN creds via env, generic 502 messages). 18/18 pytest tests passed. UI login + Faturas form placeholder (FAT-2026-XXXXXXXX) + invoice creation producing random number (FAT-2026-6D9U9HN2) all verified. Legacy sequential invoices still listed and publicly openable. Test invoices cleaned up.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "FaturaForm (Nova Fatura)", "issues": ["IBAN inválido warning shown immediately on empty form because placeholder PT50 string looks like a value; submit button is blocked when IBAN mode is selected even though f.bank.iban is actually empty if settings.bank.iban was pre-populated — minor UX friction. Not a security issue."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_security_hardening.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py is 1758 lines — recommend splitting into modules (auth, invoices, crypto, support, leads) for maintainability.",
+    "GET /api/support/ice is unauthenticated and exposes TURN username/credential publicly. Even though these are shared openrelay creds, consider gating behind auth or rotating per-session TURN credentials to avoid relay abuse.",
+    "In /api/clients and /api/invoices search, re.escape is correctly applied with 100-char cap — good. Consider also case-folding/stripping input for consistency.",
+    "next_invoice_number has a tight while-loop collision check; with 32^8 space collisions are negligible but a safety MAX_ATTEMPTS guard would prevent an unbounded loop in edge cases."
+  ],
+  "updated_files": ["/app/backend/tests/test_security_hardening.py"],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (login, form placeholder, invoice creation with random number, public link verified)"},
+  "test_credentials": "Loaded from /app/memory/test_credentials.md (admin euapostomesmo@proton.me / Invest2026! and agente@invest.pt / Agente2026!).",
+  "seed_data_creation": "Created and deleted 5 invoices via API + 1 invoice via UI; also cleaned residual TEST_* invoices from prior iterations.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "test_security_hardening.py is the regression file for the security hardening work. Admin seed updates password in-place on startup so credentials in test_credentials.md stay valid. /api/support/ice is public (no auth) — intentional per client-side pre-call. SEC-001 (support WS) and SEC-005 (iframe sandbox) remain untouched per user choice.",
+  "rca of the issue": "N/A — no bugs found."
+}

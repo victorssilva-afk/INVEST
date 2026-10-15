@@ -239,3 +239,16 @@ Multi-tenancy por Mesa · PT-PT · cores navy/dourado · numeração FAT-<ano>-<
 - APLICADO: Assistente.jsx printPdf() deixou de usar document.write() (risco XSS) → agora usa Blob URL + window.open (mantém impressão nos modos Estruturado e Personalizado). Verificado por testing_agent iteration_13 (100% frontend, 0 erros).
 - NÃO aplicado (falsos positivos confirmados por inspeção): "undefined vars" em server.py:920/1323/1493 e ai_routes.py:132 (todas atribuídas antes do uso ou o except levanta HTTPException); "is vs ==" em server.py/crypto_service.py são todos `is None`/`is not None` (idioma Python correto — trocar violaria PEP8).
 - NÃO aplicado (risco/arquitetura): token localStorage→httpOnly cookies (reescrita total de auth, quebra em domínio de preview cross-origin); refactors de complexidade e 274 catch-blocks vazios (churn sem valor, app estável e pronta p/ deploy).
+
+## 2026-10-15 — Auditoria de segurança: correções aprovadas
+- Faturas novas: numeração aleatória FAT-<ano>-<8 chars> (secrets, alfabeto sem ambíguos, verificação de unicidade). Faturas antigas mantêm números sequenciais. /invoices/next-number devolve placeholder FAT-<ano>-XXXXXXXX. Link público /fatura/{number} inalterado (não equivale a token secreto).
+- Credenciais do agente movidas para .env (AGENT_EMAIL/AGENT_PASSWORD, mesmos valores); ADMIN_* sem defaults no código.
+- P3: re.escape (máx 100 chars) nas pesquisas regex de clientes/faturas; mensagens 502 genéricas (detalhe só nos logs); TURN via .env (TURN_USERNAME/TURN_CREDENTIAL).
+- Decisão do utilizador: SEM rate limits; SEC-001 (WS suporte sem auth) e SEC-005 (iframe sem sandbox) mantidos como estão.
+- testing_agent iteration_14: backend 18/18, frontend 100%.
+
+## Backlog
+- P0: Ecrã preto Android/WebRTC — aguarda logs `adb logcat -s CIScreenShare` do utilizador.
+- P1: Deployment bloqueado pela plataforma (contactar suporte ou fork).
+- Riscos aceites: SEC-001, SEC-005, endpoints públicos sem limites.
+
