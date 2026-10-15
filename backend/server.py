@@ -4,6 +4,8 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 import os
+import re
+import secrets
 import uuid
 import asyncio
 import logging
@@ -223,13 +225,16 @@ def compute_totals(items):
     }
 
 
+INVOICE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+
 async def next_invoice_number(tenant_id: str) -> str:
     year = datetime.now(timezone.utc).year
-    key = f"{tenant_id}:{year}"
-    doc = await db.counters.find_one_and_update(
-        {"_id": key}, {"$inc": {"seq": 1}}, upsert=True, return_document=True)
-    seq = doc["seq"]
-    return f"FAT-{year}-{seq:06d}"
+    while True:
+        code = "".join(secrets.choice(INVOICE_ALPHABET) for _ in range(8))
+        number = f"FAT-{year}-{code}"
+        if not await db.invoices.find_one({"number": number}, {"_id": 1}):
+            return number
 
 
 def make_qr_datauri(text: str) -> str:
@@ -363,6 +368,7 @@ async def update_settings(body: SettingsIn, user: dict = Depends(require_roles("
 async def list_clients(q: str = "", user: dict = Depends(get_current_user)):
     query = {"tenant_id": user["tenant_id"]}
     if q:
+        q = re.escape(q[:100])
         query["$or"] = [{"name": {"$regex": q, "$options": "i"}},
                         {"company": {"$regex": q, "$options": "i"}},
                         {"nif": {"$regex": q, "$options": "i"}},
@@ -450,9 +456,7 @@ async def build_invoice_doc(body: InvoiceIn, user, request, tenant_id, agent_nam
 @api.get("/invoices/next-number")
 async def preview_next_number(user: dict = Depends(get_current_user)):
     year = datetime.now(timezone.utc).year
-    doc = await db.counters.find_one({"_id": f"{user['tenant_id']}:{year}"})
-    seq = (doc["seq"] + 1) if doc else 1
-    return {"number": f"FAT-{year}-{seq:06d}"}
+    return {"number": f"FAT-{year}-XXXXXXXX"}
 
 
 @api.get("/invoices")
@@ -461,6 +465,7 @@ async def list_invoices(status: str = "", q: str = "", user: dict = Depends(get_
     if status:
         query["status"] = status
     if q:
+        q = re.escape(q[:100])
         query["$or"] = [{"number": {"$regex": q, "$options": "i"}},
                         {"recipient.name": {"$regex": q, "$options": "i"}}]
     return await db.invoices.find(query, {"_id": 0}).sort("created_at", -1).to_list(1000)
@@ -906,7 +911,8 @@ async def crypto_market(user: dict = Depends(get_current_user)):
     try:
         market = await crypto.get_market()
     except Exception as e:
-        raise HTTPException(502, f"Dados de mercado indisponíveis: {e}")
+        logger.warning(f"market error: {e}")
+        raise HTTPException(502, "Dados de mercado indisponíveis")
     glob, fng, stables = await asyncio.gather(
         crypto.get_global(), crypto.get_fng(), crypto.get_stablecoins(),
         return_exceptions=True)
@@ -940,7 +946,8 @@ async def crypto_asset(symbol: str, days: str = "30", user: dict = Depends(get_c
         ind = crypto.compute_indicators(chart["prices"])
         return {"symbol": symbol.upper(), "chart": chart, "indicators": ind}
     except Exception as e:
-        raise HTTPException(502, f"Dados indisponíveis nesta fonte: {e}")
+        logger.warning(f"crypto source error: {e}")
+        raise HTTPException(502, "Dados indisponíveis nesta fonte")
 
 
 @api.get("/crypto/news")
@@ -963,7 +970,8 @@ async def crypto_analysis(body: dict, user: dict = Depends(get_current_user)):
     try:
         chart, market = await asyncio.gather(crypto.get_chart(symbol, days), crypto.get_market([symbol]))
     except Exception as e:
-        raise HTTPException(502, f"Dados indisponíveis nesta fonte: {e}")
+        logger.warning(f"crypto source error: {e}")
+        raise HTTPException(502, "Dados indisponíveis nesta fonte")
     glob, fng, stables = await asyncio.gather(
         crypto.get_global(), crypto.get_fng(), crypto.get_stablecoins(), return_exceptions=True)
     glob = {} if isinstance(glob, Exception) else glob
@@ -1239,8 +1247,8 @@ async def seed():
     await db.users.create_index("email", unique=True)
     await db.invoices.create_index([("tenant_id", 1), ("number", 1)])
     await db.clients.create_index("tenant_id")
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@invest.pt").lower()
-    admin_pw = os.environ.get("ADMIN_PASSWORD", "admin123")
+    admin_email = os.environ["ADMIN_EMAIL"].lower()
+    admin_pw = os.environ["ADMIN_PASSWORD"]
     existing = await db.users.find_one({"email": admin_email})
     if not existing:
         await db.users.insert_one({"id": str(uuid.uuid4()), "name": "Administrador INVEST",
@@ -1249,9 +1257,14 @@ async def seed():
                                    "created_at": now_iso()})
     elif not verify_password(admin_pw, existing["password_hash"]):
         await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_pw)}})
-    if not await db.users.find_one({"email": "agente@invest.pt"}):
+    agent_email = os.environ["AGENT_EMAIL"].lower()
+    agent_pw = os.environ["AGENT_PASSWORD"]
+    agent = await db.users.find_one({"email": agent_email})
+    if agent and not verify_password(agent_pw, agent["password_hash"]):
+        await db.users.update_one({"email": agent_email}, {"$set": {"password_hash": hash_password(agent_pw)}})
+    if not agent:
         await db.users.insert_one({"id": str(uuid.uuid4()), "name": "Agente INVEST",
-                                   "email": "agente@invest.pt", "password_hash": hash_password("Agente2026!"),
+                                   "email": agent_email, "password_hash": hash_password(agent_pw),
                                    "role": "agente", "tenant_id": DEFAULT_TENANT, "active": True,
                                    "created_at": now_iso()})
 
@@ -1484,7 +1497,8 @@ async def public_crypto_market():
     try:
         market = await crypto.get_market()
     except Exception as e:
-        raise HTTPException(502, f"Dados de mercado indisponíveis: {e}")
+        logger.warning(f"market error: {e}")
+        raise HTTPException(502, "Dados de mercado indisponíveis")
     glob, fng, stables = await asyncio.gather(
         crypto.get_global(), crypto.get_fng(), crypto.get_stablecoins(), return_exceptions=True)
     glob = {} if isinstance(glob, Exception) else glob
@@ -1500,7 +1514,8 @@ async def public_crypto_asset(symbol: str, days: str = "30"):
         chart = await crypto.get_chart(symbol.upper(), days)
         return {"symbol": symbol.upper(), "chart": chart, "indicators": crypto.compute_indicators(chart["prices"])}
     except Exception as e:
-        raise HTTPException(502, f"Dados indisponíveis nesta fonte: {e}")
+        logger.warning(f"crypto source error: {e}")
+        raise HTTPException(502, "Dados indisponíveis nesta fonte")
 
 
 @api.get("/public/crypto/news")
@@ -1517,7 +1532,8 @@ async def public_crypto_analysis(body: dict):
     try:
         chart, market = await asyncio.gather(crypto.get_chart(symbol, days), crypto.get_market([symbol]))
     except Exception as e:
-        raise HTTPException(502, f"Dados indisponíveis nesta fonte: {e}")
+        logger.warning(f"crypto source error: {e}")
+        raise HTTPException(502, "Dados indisponíveis nesta fonte")
     glob, fng, stables = await asyncio.gather(
         crypto.get_global(), crypto.get_fng(), crypto.get_stablecoins(), return_exceptions=True)
     glob = {} if isinstance(glob, Exception) else glob
@@ -1534,13 +1550,13 @@ async def public_crypto_analysis(body: dict):
 
 
 # ================= CRYPTO.INVEST — SUPORTE REMOTO (co-browsing) =================
-_turn_user = os.environ.get("TURN_USERNAME", "openrelayproject")
-_turn_cred = os.environ.get("TURN_CREDENTIAL", "openrelayproject")
+_turn_user = os.environ["TURN_USERNAME"]
+_turn_cred = os.environ["TURN_CREDENTIAL"]
 ICE_SERVERS = [
     {"urls": ["stun:stun.l.google.com:19302", "stun:stun.relay.metered.ca:80"]},
     {"urls": ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443",
               "turns:openrelay.metered.ca:443?transport=tcp"],
-     "username": "openrelayproject", "credential": "openrelayproject"},
+     "username": _turn_user, "credential": _turn_cred},
     {"urls": ["turn:global.relay.metered.ca:80", "turns:global.relay.metered.ca:443?transport=tcp"],
      "username": _turn_user, "credential": _turn_cred},
 ]

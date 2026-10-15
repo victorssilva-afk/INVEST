@@ -7,6 +7,7 @@ reutilizando o router /api, a ligação Mongo e a autenticação existentes.
 import os
 import json
 import uuid
+import logging
 from datetime import datetime, timezone
 from typing import Optional, List
 
@@ -15,6 +16,7 @@ from pydantic import BaseModel
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
 EMERGENT_LLM_KEY = os.environ.get("EMERGENT_LLM_KEY")
+logger = logging.getLogger("invest.ai")
 
 CHAT_MODELS = {
     "gpt-5.4": ("openai", "gpt-5.4"),
@@ -125,7 +127,8 @@ def register_ai_routes(api, db, get_current_user):
             llm = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=body.session_id, system_message=system).with_model(provider, model)
             reply = await llm.send_message(UserMessage(text=body.message))
         except Exception as e:
-            raise HTTPException(502, f"Falha da IA: {e}")
+            logger.warning(f"ai error: {e}")
+            raise HTTPException(502, "Falha da IA. Tente novamente.")
         saved = await _save_msg(body.session_id, "assistant", reply, extra={"model": body.model or DEFAULT_MODEL})
         if s.get("title") in (None, "", "Nova conversa"):
             await db.ai_sessions.update_one({"id": body.session_id}, {"$set": {"title": body.message[:60]}})
@@ -146,7 +149,8 @@ def register_ai_routes(api, db, get_current_user):
             um = UserMessage(text=body.prompt, file_contents=file_contents or None)
             _text, images = await llm.send_message_multimodal_response(um)
         except Exception as e:
-            raise HTTPException(502, f"Falha ao gerar imagem: {e}")
+            logger.warning(f"image error: {e}")
+            raise HTTPException(502, "Falha ao gerar imagem. Tente novamente.")
         if not images:
             raise HTTPException(502, "Nenhuma imagem gerada")
         img = images[0]
@@ -176,7 +180,8 @@ def register_ai_routes(api, db, get_current_user):
         try:
             raw = await chat.send_message(UserMessage(text=prompt))
         except Exception as e:
-            raise HTTPException(502, f"Falha da IA: {e}")
+            logger.warning(f"ai error: {e}")
+            raise HTTPException(502, "Falha da IA. Tente novamente.")
         html = raw.strip()
         if html.startswith("```"):
             html = html.strip("`")
@@ -209,7 +214,8 @@ def register_ai_routes(api, db, get_current_user):
             llm = LlmChat(api_key=EMERGENT_LLM_KEY, session_id=str(uuid.uuid4()), system_message=system).with_model(provider, model)
             raw = await llm.send_message(UserMessage(text=body.brief))
         except Exception as e:
-            raise HTTPException(502, f"Falha da IA: {e}")
+            logger.warning(f"ai error: {e}")
+            raise HTTPException(502, "Falha da IA. Tente novamente.")
         txt = (raw or "").strip()
         if txt.startswith("```"):
             txt = txt.strip("`")

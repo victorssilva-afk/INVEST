@@ -347,4 +347,5 @@ async def generate_ai_report(symbol, timeframe, ind, scores, market_row, glob, f
         resp = await chat.send_message(msg)
         return resp if isinstance(resp, str) else str(resp)
     except Exception as e:
-        return f"[Análise de IA indisponível: {e}]"
+        print(f"ai report error: {e}")
+        return "[Análise de IA indisponível de momento]"
